@@ -39,6 +39,12 @@ def compute_run_summary(run_dir: Path, early_trials: int, late_trials: int) -> d
     corr_r_delta = np.corrcoef(subjects["r_post1"], subjects["delta_pi"])[0, 1]
     corr_delta_r = np.corrcoef(subjects["delta_pi"], subjects["r_measure"])[0, 1]
 
+    early = trials[trials["trial"] <= early_trials]
+    early_mean = early.groupby("subject")["error"].mean().reset_index()
+    early_mean["abs_error"] = early_mean["error"].abs()
+    merged = subjects.merge(early_mean, on="subject", how="inner")
+    corr_delta_early_abs = np.corrcoef(merged["delta_pi"], merged["abs_error"])[0, 1]
+
     return {
         "early_mean_error": early_mean,
         "late_mean_error": late_mean,
@@ -47,6 +53,7 @@ def compute_run_summary(run_dir: Path, early_trials: int, late_trials: int) -> d
         "mean_k_early": float(k_early),
         "corr_rpost1_delta": float(corr_r_delta),
         "corr_delta_rmeasure": float(corr_delta_r),
+        "corr_delta_early_abs_error": float(corr_delta_early_abs),
     }
 
 
@@ -107,12 +114,37 @@ def plot_plateau_effects(summary: pd.DataFrame, outdir: Path) -> None:
 def plot_rho_realization(summary: pd.DataFrame, outdir: Path) -> None:
     fig, ax = plt.subplots(figsize=(6.5, 4.5))
     ax.scatter(summary["rho"], summary["corr_rpost1_delta"], alpha=0.6, color="#1b6f8a")
-    ax.axhline(0, color="#444444", lw=1, ls="--")
+    low = min(summary["rho"].min(), summary["corr_rpost1_delta"].min())
+    high = max(summary["rho"].max(), summary["corr_rpost1_delta"].max())
+    ax.plot([low, high], [low, high], color="#444444", lw=1, ls="--")
     ax.set_xlabel("Target rho")
     ax.set_ylabel("Realized corr(r_post1, delta_pi)")
     ax.set_title("Collinearity Check")
     fig.tight_layout()
     fig.savefig(outdir / "rho_realization.png", dpi=160)
+    plt.close(fig)
+
+
+def plot_delta_pi_vs_early_error(summary: pd.DataFrame, outdir: Path) -> None:
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    for model, strength_col, label, color in [
+        ("M1", "beta", "M1 beta", "#1b6f8a"),
+        ("M2", "lam", "M2 lambda", "#7a2d2d"),
+    ]:
+        sub = summary[summary["model"] == model]
+        grouped = sub.groupby(strength_col)["corr_delta_early_abs_error"]
+        x = grouped.mean().index.values
+        y = grouped.mean().values
+        yerr = grouped.sem().values
+        ax.errorbar(x, y, yerr=yerr, marker="o", lw=2, color=color, label=label)
+
+    ax.axhline(0, color="#444444", lw=1, ls="--")
+    ax.set_xlabel("Modulation strength")
+    ax.set_ylabel("corr(Δπ, early |error|)")
+    ax.set_title("Δπ vs Early |Error| (Correlation)")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(outdir / "delta_pi_vs_early_abs_error.png", dpi=160)
     plt.close(fig)
 
 
@@ -153,6 +185,7 @@ def main() -> None:
     plot_strength_effects(summary_df, fig_dir)
     plot_plateau_effects(summary_df, fig_dir)
     plot_rho_realization(summary_df, fig_dir)
+    plot_delta_pi_vs_early_error(summary_df, fig_dir)
 
     print(f"Wrote {summary_path} and figures to {fig_dir}")
 

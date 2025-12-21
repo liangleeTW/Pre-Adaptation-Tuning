@@ -5,9 +5,8 @@ Simulation and analysis code for precision transfer in prism adaptation.
 ## Quickstart (macOS)
 
 ```bash
-brew install pyenv uv
-pyenv install 3.12
-pyenv local 3.12
+brew install uv
+uv python install 3.12
 uv sync
 uv run ./scripts/run_sim.py
 uv run ./scripts/plot_sim.py
@@ -31,47 +30,32 @@ Key outputs:
 This repo uses `pyenv` to install Python 3.12 and `uv` to manage the virtual
 environment. Follow these steps after cloning.
 
-## 1) Install pyenv
-
-macOS (Homebrew):
-
-```bash
-brew install pyenv
-```
-
-Shell setup (add to your shell rc file, then restart shell):
-
-```bash
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init -)"
-```
-
-Verify:
-
-```bash
-pyenv --version
-```
-
-## 2) Install Python 3.12 with pyenv
-
-```bash
-pyenv install 3.12
-pyenv local 3.12
-pyenv version
-pyenv which python
-```
-
-## 3) Install uv
+## 1) Install uv (recommended)
 
 macOS (Homebrew):
 
 ```bash
 brew install uv
-uv --version # Verify
 ```
 
-## 4) Create and use the virtual environment
+Install Python 3.12 via uv:
+
+```bash
+uv python install 3.12
+```
+
+## 2) Optional: pyenv (if you already use it)
+
+If you prefer pyenv for global version management, you can use it instead of
+`uv python install`:
+
+```bash
+brew install pyenv
+pyenv install 3.12
+pyenv local 3.12
+```
+
+## 3) Create and use the virtual environment
 
 ```bash
 uv venv --python 3.12
@@ -86,7 +70,7 @@ uv pip install -r requirements.txt
 uv sync
 ```
 
-## 5) Common commands
+## 4) Common commands
 
 Check interpreter:
 

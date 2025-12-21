@@ -53,6 +53,9 @@ Interpretation: stronger modulation lowers average early learning rate when
 aggregating across mixed positive/negative delta_pi. The effect is modest
 because opposing delta_pi directions partially cancel.
 
+Plot:
+- `data/sim_sweep/figures/early_slope_vs_strength.png`
+
 ### 3.2 Delta Precision vs Early Error (Plan.md 2.2 proxy in simulation)
 
 To check whether M1 and M2 produce opposite directional signatures, we computed
@@ -79,7 +82,11 @@ Interpretation:
 - The nonzero baseline at strength 0 reflects collinearity between r_post1 and
   delta_pi (by design in the sweep).
 
-This is the intended mechanistic contrast for model recovery.
+This is the intended mechanistic contrast for model recovery. The summary plot
+is saved as `data/sim_sweep/figures/delta_pi_vs_early_abs_error.png`.
+
+Plot:
+- `data/sim_sweep/figures/delta_pi_vs_early_abs_error.png`
 
 ### 3.3 Plateau Confound (Plan.md 3.4, 3.5)
 
@@ -95,6 +102,9 @@ Interpretation: the confound is now visible in the output, allowing us to test
 whether fitting models without a plateau term can spuriously attribute the
 residual error to precision modulation.
 
+Plot:
+- `data/sim_sweep/figures/late_error_vs_plateau.png`
+
 ### 3.4 Collinearity Stress (Plan.md 3.4)
 
 We compared target rho to realized corr(r_post1, delta_pi):
@@ -104,7 +114,11 @@ We compared target rho to realized corr(r_post1, delta_pi):
 
 Interpretation: the realized correlation is weaker than the target because
 r_post1 is lognormal and the sample size is finite. This is acceptable for now
-but should be tightened if we need strict collinearity control.
+but should be tightened if we need strict collinearity control. The scatter is
+saved as `data/sim_sweep/figures/rho_realization.png` (identity line included).
+
+Plot:
+- `data/sim_sweep/figures/rho_realization.png`
 
 ## 4. Real-Data Fitting (Plan.md Section 4)
 
@@ -113,10 +127,7 @@ signatures to validate recovery when the fitting pipeline is added.
 
 ## 5. Visualization Outputs
 
-Quick-look plots:
-- `data/sim_sweep/figures/early_slope_vs_strength.png`
-- `data/sim_sweep/figures/late_error_vs_plateau.png`
-- `data/sim_sweep/figures/rho_realization.png`
+Plots are referenced within each subsection above.
 
 Interactive notebook:
 - `notebooks/sweep_analysis.ipynb`
