@@ -38,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n-trials", type=int, default=100)
     parser.add_argument("--models", type=str, default="M0,M1,M2")
     parser.add_argument("--betas", type=str, default="0.0,0.2,0.5,0.8")
-    parser.add_argument("--lams", type=str, default="0.0,0.2,0.5,0.8")
+    parser.add_argument("--lams", type=str, default="-0.8,-0.5,-0.2,0.0,0.2,0.5,0.8")
     parser.add_argument("--delta-pi-sds", type=str, default="0.5,1.0,1.6")
     parser.add_argument("--rhos", type=str, default="0.0,0.3,0.6")
     parser.add_argument("--plateau-fracs", type=str, default="0.0,0.15")
@@ -46,6 +46,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--r-mean", type=float, default=1.0)
     parser.add_argument("--r-log-sd", type=float, default=0.3)
     parser.add_argument("--outdir", type=str, default="data/sim_sweep")
+    parser.add_argument(
+        "--delta-pi-metric",
+        type=str,
+        default="pi",
+        choices=["pi", "logpi"],
+        help="Interpretation of delta_pi (raw precision or log precision).",
+    )
+    parser.add_argument("--group-labels", type=str, default="")
+    parser.add_argument("--group-delta-pi-means", type=str, default="")
+    parser.add_argument("--group-delta-pi-sds", type=str, default="")
+    parser.add_argument("--group-weights", type=str, default="")
     return parser.parse_args()
 
 
@@ -59,6 +70,17 @@ def main() -> None:
     rhos = parse_float_list(args.rhos)
     plateau_fracs = parse_float_list(args.plateau_fracs)
     seeds = parse_int_list(args.seeds)
+
+    group_labels = [g.strip() for g in args.group_labels.split(",") if g.strip()]
+    group_means = parse_float_list(args.group_delta_pi_means)
+    group_sds = parse_float_list(args.group_delta_pi_sds)
+    group_weights = parse_float_list(args.group_weights)
+
+    if group_labels:
+        if not (len(group_labels) == len(group_means) == len(group_sds)):
+            raise ValueError("Group labels, means, and sds must have matching lengths.")
+        if group_weights and len(group_weights) != len(group_labels):
+            raise ValueError("Group weights must match number of group labels.")
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -91,7 +113,28 @@ def main() -> None:
                                 )
                                 log_r = math.log(args.r_mean) + args.r_log_sd * z_r
                                 r_post1 = np.exp(log_r)
-                                delta_pi = delta_sd * z_delta
+
+                                if group_labels:
+                                    weights = (
+                                        np.array(group_weights)
+                                        if group_weights
+                                        else np.ones(len(group_labels))
+                                    )
+                                    weights = weights / weights.sum()
+                                    group_sizes = rng.multinomial(args.n_subjects, weights)
+                                    group_assignments = []
+                                    for label, size in zip(group_labels, group_sizes):
+                                        group_assignments.extend([label] * size)
+                                    rng.shuffle(group_assignments)
+                                    group_index = {label: i for i, label in enumerate(group_labels)}
+                                    delta_pi = np.zeros(args.n_subjects)
+                                    for i, label in enumerate(group_assignments):
+                                        idx = group_index[label]
+                                        delta_pi[i] = group_means[idx] + (group_sds[idx] * delta_sd) * z_delta[i]
+                                    groups = group_assignments
+                                else:
+                                    delta_pi = delta_sd * z_delta
+                                    groups = ["all"] * args.n_subjects
 
                                 params = ModelParams(
                                     b=plateau * abs(ModelParams().m),
@@ -105,6 +148,7 @@ def main() -> None:
                                         model=model,
                                         beta=beta,
                                         lam=lam,
+                                        group=groups[i],
                                     )
                                     for i in range(args.n_subjects)
                                 ]
@@ -141,6 +185,8 @@ def main() -> None:
                                                 "beta": cfg.beta,
                                                 "lam": cfg.lam,
                                                 "plateau_b": params.b,
+                                                "group": cfg.group,
+                                                "delta_pi_metric": args.delta_pi_metric,
                                             }
                                         )
 
@@ -151,10 +197,12 @@ def main() -> None:
                                         "r_post1": r_post1,
                                         "delta_pi": delta_pi,
                                         "r_measure": r_values,
+                                        "group": groups,
                                         "model": model,
                                         "beta": beta,
                                         "lam": lam,
                                         "plateau_b": params.b,
+                                        "delta_pi_metric": args.delta_pi_metric,
                                     }
                                 )
 
@@ -176,6 +224,23 @@ def main() -> None:
                                         "n_trials": args.n_trials,
                                         "r_mean": args.r_mean,
                                         "r_log_sd": args.r_log_sd,
+                                        "group_labels": ",".join(group_labels) if group_labels else "",
+                                        "group_delta_pi_means": ",".join(
+                                            f"{v:.3f}" for v in group_means
+                                        )
+                                        if group_labels
+                                        else "",
+                                        "group_delta_pi_sds": ",".join(
+                                            f"{v:.3f}" for v in group_sds
+                                        )
+                                        if group_labels
+                                        else "",
+                                        "group_weights": ",".join(
+                                            f"{v:.3f}" for v in group_weights
+                                        )
+                                        if group_weights
+                                        else "",
+                                        "delta_pi_metric": args.delta_pi_metric,
                                         "output_dir": str(run_dir),
                                     }
                                 )

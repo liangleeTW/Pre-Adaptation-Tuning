@@ -19,6 +19,7 @@ class SubjectConfig:
     model: str
     beta: float
     lam: float
+    group: str = "all"
 
 
 def simulate_subject(

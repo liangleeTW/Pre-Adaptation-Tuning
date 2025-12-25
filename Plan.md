@@ -16,7 +16,23 @@ The central questions are:
 
 ---
 
-### 1.2 Modeling Perspective
+### 1.2 Experimental Context and Design Implications
+
+The pre-adaptation phase manipulates visual availability during reaching (EO+, EO-, EC) to shape proprioceptive precision profiles before prism exposure. This yields a participant-specific tuning signal
+\[
+\Delta\pi_i = \log \pi^{\mathrm{post1}}_{P,i} - \log \pi^{\mathrm{pre}}_{P,i},
+\]
+which can be positive (sharpened precision) or negative (blunted precision). The key mechanistic claim is that these pre-exposure precision changes transfer into prism adaptation via their effect on the effective measurement noise \(R_i\).
+
+Because \(\Delta\pi_i\) is signed, the sign of the modulation parameter (especially \(\lambda\) in M2) is theoretically meaningful:
+- **\(\lambda > 0\)**: \(\Delta\pi_i>0\) reduces \(R_i\) (greater error utilization); \(\Delta\pi_i<0\) increases \(R_i\) (more conservative learning).
+- **\(\lambda < 0\)**: the mapping reverses, implying that increased precision reduces error utilization (an attribution-dominant regime).
+
+This sign directly shapes predicted group differences. If the tuning manipulation reliably shifts \(\Delta\pi\) by group, the expected ordering of early adaptation rates should flip under \(\lambda>0\) vs \(\lambda<0\). Distinguishing these regimes is central to the interpretive payoff of the experiment.
+
+---
+
+### 1.3 Modeling Perspective
 
 Prism adaptation is framed as a **state-space learning process** in which endpoint error serves as a measurement signal. Learning dynamics are governed by the Kalman gain, which depends critically on the **measurement noise term \(R\)**.
 
@@ -39,7 +55,7 @@ where:
 
 ---
 
-### 1.3 Overall Strategy
+### 1.4 Overall Strategy
 
 - **Primary goal**: parameter recovery and interpretability of the \(R\)-mapping parameters (\(\lambda\), \(\beta\)).
 - **Secondary goal**: identify and control for confounds, especially non-zero error plateaus.
@@ -72,6 +88,9 @@ We estimate their association using a **Bayesian correlation or regression model
 - A weak association supports treating onset reliability and tuning direction as dissociable inputs to the mechanistic models.
 - Strong collinearity signals an identifiability risk for M1/M2 and motivates caution or rescaling.
 
+Additional group-level check:
+- Verify that \(\Delta\pi\) distributions differ across EO+, EO-, EC in the intended direction and that overlap is not so large as to obscure sign-dependent effects.
+
 ---
 
 ### 2.2 Check 2: Phenomenological Precision–Behavior Mapping
@@ -99,6 +118,9 @@ Define \( \Delta y_{i,t+1} = y_{i,t+1} - y_{i,t} \) and estimate:
 The proxy (\(\alpha_i\) or \(\gamma_i\)) is then related to \( \log \pi_{P,i} \) using Bayesian regression, optionally including group and interaction terms.
 
 These mappings are reported as supportive evidence (often in Supplementary Materials); mechanistic inference relies on the models below.
+
+Optional targeted check:
+- Stratify the proxy mapping by the sign of \(\Delta\pi\) to visualize whether learning changes are monotonic with \(\Delta\pi\) and whether any reversal suggests \(\lambda<0\).
 
 ---
 
@@ -154,7 +176,7 @@ Held constant to preserve identifiability:
 ### 3.4 Swept Parameters
 
 1. **Mechanism strength**
-   - \( \lambda \in \{0, 0.2, 0.5, 0.8\} \)  
+   - \( \lambda \in \{-0.8, -0.5, -0.2, 0, 0.2, 0.5, 0.8\} \)  
    - or \(\beta\) at small / medium / large magnitudes
 
 2. **Scale of tuning**
@@ -167,6 +189,10 @@ Held constant to preserve identifiability:
    - \( b \in \{0, b_0\} \), with \( b_0 \approx 10\%\text{–}20\% \, |m| \)
    - Fit models with and without \(b\)
 
+5. **Group structure (design realism)**
+   - Generate \(\Delta\pi\) with group-specific means/SDs reflecting EO+, EO-, EC.
+   - Evaluate whether sign recovery depends on group separation or overlap.
+
 ---
 
 ### 3.5 Evaluation Metrics
@@ -175,6 +201,23 @@ Held constant to preserve identifiability:
 - 95% interval coverage
 - Boundary saturation rate (posterior mass at \(\pm1\))
 - Spurious recovery under plateau misspecification
+ - **Sign recovery**: posterior probability \(\Pr(\lambda>0)\) or \(\Pr(\lambda<0)\) under known ground truth.
+ - **Group-order predictions**: whether simulated group differences in early learning match the ground-truth sign regime.
+
+---
+
+### 3.6 Robust Simulation Checklist (Confidence Building)
+
+A robust simulation suite should include:
+1. **Parameter recovery** under realistic group-wise \(\Delta\pi\) distributions and sample sizes.
+2. **Sign identifiability** of \(\lambda\) when \(\Delta\pi\) spans both positive and negative values.
+3. **Model misspecification tests**, including:
+   - fitting without plateau when data include \(b\),
+   - fitting with plateau when data have \(b=0\),
+   - varying \(A\) and \(Q\) with regularization.
+4. **Noise sensitivity**, exploring broader ranges of \(R^{\mathrm{post1}}_{P}\) dispersion and trial counts.
+5. **Proxy coherence**, verifying that early-phase proxies (slope, \(\tau\), \(\gamma\)) track the mechanistic effect direction.
+6. **Posterior predictive checks** that reproduce early dynamics and late plateaus for each model.
 
 ---
 

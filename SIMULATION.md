@@ -53,7 +53,7 @@ Notebook:
 
 Defaults are chosen to match the Plan.md simulation section:
 - Models: M0, M1, M2
-- M2 lambda: 0, 0.2, 0.5, 0.8
+- M2 lambda: -0.8, -0.5, -0.2, 0, 0.2, 0.5, 0.8
 - M1 beta: 0, 0.2, 0.5, 0.8
 - Delta precision SD: 0.5, 1.0, 1.6
 - Collinearity rho: 0, 0.3, 0.6
@@ -81,6 +81,40 @@ Customize ranges with flags, for example:
 
 ```bash
 uv run ./scripts/run_sweep.py --models M2 --lams 0,0.5 --delta-pi-sds 1.0 --seeds 0
+```
+
+## Group-structured tuning (EO+/EO-/EC)
+
+You can impose group-specific \(\Delta\pi\) distributions to mirror the tuning phase:
+
+```bash
+uv run ./scripts/run_sweep.py \
+  --group-labels EO+,EO-,EC \
+  --group-delta-pi-means 0.3,0.0,-0.3 \
+  --group-delta-pi-sds 0.6,0.6,0.6 \
+  --group-weights 0.33,0.33,0.34
+```
+
+`--delta-pi-sds` acts as a global scale multiplier on the group SDs, allowing
+additional sweeps over tuning dispersion.
+
+Use `--delta-pi-metric logpi` to interpret the tuning variable as Δlog precision
+instead of Δprecision. This only changes interpretation; the simulation uses the
+provided values directly.
+
+## One-command sweep from data
+
+If you have run `scripts/plot_delta_pi_groups.py`, you can launch a sweep using
+the derived group parameters:
+
+```bash
+uv run python scripts/run_sweep_from_data.py --metric pi
+```
+
+Add any extra sweep args at the end, e.g.:
+
+```bash
+uv run python scripts/run_sweep_from_data.py --metric pi --lams -0.5,0,0.5 --seeds 0
 ```
 
 ## Sweep summary + plots

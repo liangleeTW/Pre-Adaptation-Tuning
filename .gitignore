@@ -4,4 +4,9 @@ __pycache__/
 .ipynb_checkpoints/
 
 data/
+note1.png
+note2.png
+note3.png
+note4.png
+main_latex.txt
 .DS_Store
