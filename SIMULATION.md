@@ -117,6 +117,45 @@ Add any extra sweep args at the end, e.g.:
 uv run python scripts/run_sweep_from_data.py --metric pi --lams -0.5,0,0.5 --seeds 0
 ```
 
+By default, this command will auto-load calibration values from
+`data/derived/adaptation_calibration.csv` and pass:
+- `--m` set to the mean early adaptation error
+- `--plateau-bs` set to `0.0` and the mean late adaptation error
+
+Disable calibration with:
+
+```bash
+uv run python scripts/run_sweep_from_data.py --metric pi --no-calibration
+```
+
+## Group-specific modulation (beta/lambda)
+
+You can assign different \(\beta\) or \(\lambda\) per group at generation time:
+
+```bash
+uv run ./scripts/run_sweep.py \
+  --group-labels EC,EO+,EO- \
+  --group-delta-pi-means 0.198,0.096,0.062 \
+  --group-delta-pi-sds 0.377,0.237,0.248 \
+  --group-betas 0.2,0.1,0.0
+```
+
+For M2, use `--group-lams` instead of `--group-betas`.
+
+## Parameter recovery (simulation fitting)
+
+Fit each run to recover \(\beta\) or \(\lambda\) from simulated data:
+
+```bash
+uv run python scripts/fit_sim_recovery.py --sweep-dir data/sim_sweep_20251225_115250
+```
+
+Summarize recovery metrics (bias/RMSE/sign match):
+
+```bash
+uv run python scripts/analyze_recovery.py --sweep-dir data/sim_sweep_20251225_115250
+```
+
 ## Sweep summary + plots
 
 After the sweep finishes:

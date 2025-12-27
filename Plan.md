@@ -201,8 +201,8 @@ Held constant to preserve identifiability:
 - 95% interval coverage
 - Boundary saturation rate (posterior mass at \(\pm1\))
 - Spurious recovery under plateau misspecification
- - **Sign recovery**: posterior probability \(\Pr(\lambda>0)\) or \(\Pr(\lambda<0)\) under known ground truth.
- - **Group-order predictions**: whether simulated group differences in early learning match the ground-truth sign regime.
+- **Sign recovery**: posterior probability \(\Pr(\lambda>0)\) or \(\Pr(\lambda<0)\) under known ground truth.
+- **Group-order predictions**: whether simulated group differences in early learning match the ground-truth sign regime.
 
 ---
 
@@ -288,3 +288,37 @@ This plan enables a principled test of whether **precision transfer modulates er
 - and aligning empirical checks with mechanistic inference.
 
 The plan is now ready to be translated directly into simulation and fitting code.
+
+---
+
+## 6. Current Status and Next Actions
+
+### 6.1 Completed
+
+- Group-structured simulation based on empirical \(\Delta\pi\) distributions.
+- Adaptation error calibration (early mean for \(m\); late mean for \(b\)).
+- Recovery fitting pipeline and diagnostic plots.
+- Group-level early-slope plots and improved plateau/collinearity diagnostics.
+
+### 6.2 Next Actions (Simulation)
+
+1. **Group-specific modulation recovery**
+   - Fit simulations with group-specific \(\lambda_g\) or \(\beta_g\).
+   - Evaluate identifiability and bias per group.
+2. **Sensitivity to calibration and noise**
+   - Sweep \(Q\) and \(R\) dispersion to match empirical variability.
+   - Test robustness of recovery to plateau misspecification.
+3. **Power and separation**
+   - Quantify how much group separation in \(\Delta\pi\) is needed for reliable sign recovery.
+
+### 6.3 Next Actions (Real Data)
+
+1. **Pre-model checks**
+   - Independence of \(R^{post1}_P\) and \(\Delta\pi\).
+   - Precision–behavior mapping using early-learning proxies.
+2. **Mechanistic fitting**
+   - Fit M0–M2 to adaptation-phase error trials.
+   - Compare models with LOO/WAIC and posterior predictive checks.
+3. **Group effects**
+   - Decide whether to model group-specific modulation parameters or group offsets.
+   - Report group differences in fitted parameters and predictive trajectories.

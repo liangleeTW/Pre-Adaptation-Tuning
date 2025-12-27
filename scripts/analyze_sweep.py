@@ -114,7 +114,6 @@ def plot_strength_effects(summary: pd.DataFrame, outdir: Path) -> None:
     ax.set_xlabel("Modulation strength")
     ax.set_ylabel("Early slope (mean error vs trial)")
     ax.set_title("Early Learning Slope vs Modulation Strength")
-    ax.set_ylim(0.85, 0.95)
     ax.legend(frameon=False)
     fig.tight_layout()
     fig.savefig(outdir / "early_slope_vs_strength.png", dpi=160)
@@ -149,6 +148,72 @@ def plot_plateau_effects(summary: pd.DataFrame, outdir: Path) -> None:
     plt.close(fig)
 
 
+def plot_plateau_residuals(summary: pd.DataFrame, outdir: Path) -> None:
+    df = summary.copy()
+    if "plateau_b" not in df.columns or "late_mean_error" not in df.columns:
+        return
+    df["late_residual"] = df["late_mean_error"] - df["plateau_b"]
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    grouped = df.groupby(["model", "plateau_b"])["late_residual"]
+    for model, color in [("M0", "#1b6f8a"), ("M1", "#5b2c83"), ("M2", "#7a2d2d")]:
+        model_df = df[df["model"] == model]
+        means = model_df.groupby("plateau_b")["late_residual"].mean()
+        sems = model_df.groupby("plateau_b")["late_residual"].sem()
+        ax.errorbar(
+            means.index.values,
+            means.values,
+            yerr=sems.values,
+            marker="o",
+            lw=2,
+            color=color,
+            label=model,
+        )
+
+    ax.axhline(0, color="#444444", lw=1, ls="--")
+    ax.set_xlabel("Plateau bias b")
+    ax.set_ylabel("Late error residual (late mean - b)")
+    ax.set_title("Plateau Residual Check")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(outdir / "late_error_residual_vs_plateau.png", dpi=160)
+    plt.close(fig)
+
+
+def plot_group_late_error(trials: pd.DataFrame, outdir: Path, late_trials: int) -> None:
+    if "group" not in trials.columns:
+        return
+    max_trial = trials["trial"].max()
+    late = trials[trials["trial"] > (max_trial - late_trials)]
+    grouped = late.groupby(["group", "model"])["error"]
+    means = grouped.mean().reset_index()
+    sems = grouped.sem().reset_index().rename(columns={"error": "sem"})
+    merged = means.merge(sems, on=["group", "model"], how="left")
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    colors = {"EC": "#1b6f8a", "EO+": "#7a2d2d", "EO-": "#5b2c83"}
+    for model in sorted(merged["model"].unique()):
+        sub = merged[merged["model"] == model]
+        x = np.arange(len(sub["group"]))
+        ax.errorbar(
+            x + {"M0": -0.2, "M1": 0.0, "M2": 0.2}[model],
+            sub["error"],
+            yerr=sub["sem"],
+            fmt="o",
+            label=model,
+            color="#444444",
+        )
+    ax.set_xticks(np.arange(len(sorted(merged["group"].unique()))))
+    ax.set_xticklabels(sorted(merged["group"].unique()))
+    ax.set_xlabel("Group")
+    ax.set_ylabel("Late mean error")
+    ax.set_title("Late Error by Group and Model")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(outdir / "late_error_by_group.png", dpi=160)
+    plt.close(fig)
+
+
 def plot_rho_realization(summary: pd.DataFrame, outdir: Path) -> None:
     fig, ax = plt.subplots(figsize=(6.5, 4.5))
     ax.scatter(summary["rho"], summary["corr_rpost1_delta"], alpha=0.6, color="#1b6f8a")
@@ -157,9 +222,40 @@ def plot_rho_realization(summary: pd.DataFrame, outdir: Path) -> None:
     ax.plot([low, high], [low, high], color="#444444", lw=1, ls="--")
     ax.set_xlabel("Target rho")
     ax.set_ylabel("Realized corr(r_post1, delta_pi)")
-    ax.set_title("Collinearity Check")
+    ax.set_title("Collinearity Check (Scatter)")
     fig.tight_layout()
-    fig.savefig(outdir / "rho_realization.png", dpi=160)
+    fig.savefig(outdir / "rho_realization_scatter.png", dpi=160)
+    plt.close(fig)
+
+
+def plot_rho_realization_box(summary: pd.DataFrame, outdir: Path) -> None:
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+    groups = []
+    labels = []
+    for rho in sorted(summary["rho"].unique()):
+        groups.append(summary.loc[summary["rho"] == rho, "corr_rpost1_delta"].values)
+        labels.append(f"{rho:.2f}")
+    ax.boxplot(groups, labels=labels)
+    ax.axhline(0, color="#444444", lw=1, ls="--")
+    ax.set_xlabel("Target rho")
+    ax.set_ylabel("Realized corr(r_post1, delta_pi)")
+    ax.set_title("Collinearity Check (Boxplot)")
+    fig.tight_layout()
+    fig.savefig(outdir / "rho_realization_boxplot.png", dpi=160)
+    plt.close(fig)
+
+
+def plot_rho_sample_scatter(trials: pd.DataFrame, outdir: Path) -> None:
+    if "r_post1" not in trials.columns or "delta_pi" not in trials.columns:
+        return
+    sample = trials.drop_duplicates("subject")
+    fig, ax = plt.subplots(figsize=(6.0, 4.5))
+    ax.scatter(sample["r_post1"], sample["delta_pi"], alpha=0.6, color="#1b6f8a")
+    ax.set_xlabel("r_post1")
+    ax.set_ylabel("delta_pi")
+    ax.set_title("Sample Run: r_post1 vs delta_pi")
+    fig.tight_layout()
+    fig.savefig(outdir / "rho_sample_scatter.png", dpi=160)
     plt.close(fig)
 
 
@@ -209,7 +305,6 @@ def plot_group_strength_effects(summary: pd.DataFrame, outdir: Path) -> None:
         ax.set_xlabel("Modulation strength")
         ax.set_ylabel("Early slope (mean error vs trial)")
         ax.set_title(f"Early Slope vs Strength ({group_label})")
-        ax.set_ylim(0.85, 0.95)
         ax.legend(frameon=False)
         fig.tight_layout()
         fig.savefig(outdir / f"early_slope_vs_strength_{group_label}.png", dpi=160)
@@ -240,7 +335,6 @@ def plot_group_comparison(summary: pd.DataFrame, outdir: Path) -> None:
         ax.set_xlabel("Modulation strength")
         ax.set_ylabel("Early slope (mean error vs trial)")
         ax.set_title(title)
-        ax.set_ylim(0.85, 0.95)
         ax.legend(frameon=False)
         fig.tight_layout()
         fig.savefig(outdir / filename, dpi=160)
@@ -304,7 +398,6 @@ def plot_group_combined_strengths(summary: pd.DataFrame, outdir: Path) -> None:
     ax.set_xlabel("Modulation strength")
     ax.set_ylabel("Early slope (mean error vs trial)")
     ax.set_title("Early Slope vs Strength (Groups: M2 solid, M1 dashed)")
-    ax.set_ylim(0.85, 0.95)
     ax.legend(frameon=False)
     fig.tight_layout()
     fig.savefig(outdir / "early_slope_vs_strength_groups_combined.png", dpi=160)
@@ -343,11 +436,21 @@ def main() -> None:
     summary_path = sweep_dir / "summary.csv"
     summary_df.to_csv(summary_path, index=False)
 
+    trials_all = []
+    for _, row in index.iterrows():
+        run_dir = Path(row["output_dir"])
+        trials_all.append(pd.read_csv(run_dir / "sim_trials.csv"))
+    trials_df = pd.concat(trials_all, ignore_index=True)
+
     fig_dir = sweep_dir / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
     plot_strength_effects(summary_df, fig_dir)
     plot_plateau_effects(summary_df, fig_dir)
+    plot_plateau_residuals(summary_df, fig_dir)
+    plot_group_late_error(trials_df, fig_dir, args.late_trials)
     plot_rho_realization(summary_df, fig_dir)
+    plot_rho_realization_box(summary_df, fig_dir)
+    plot_rho_sample_scatter(trials_df, fig_dir)
     plot_delta_pi_vs_early_error(summary_df, fig_dir)
     plot_group_strength_effects(summary_df, fig_dir)
     plot_group_comparison(summary_df, fig_dir)

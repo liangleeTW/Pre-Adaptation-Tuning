@@ -39,6 +39,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--r-mean", type=float, default=1.0, help="Mean of R_post1 (log scale)")
     parser.add_argument("--r-log-sd", type=float, default=0.3, help="SD of log(R_post1)")
     parser.add_argument("--plateau-frac", type=float, default=0.0, help="b as fraction of |m|")
+    parser.add_argument("--plateau-b", type=float, default=None, help="Absolute plateau bias")
+    parser.add_argument("--m", type=float, default=None, help="Perturbation size (signed)")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--outdir", type=str, default="data/sim")
     parser.add_argument(
@@ -52,6 +54,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--group-delta-pi-means", type=str, default="")
     parser.add_argument("--group-delta-pi-sds", type=str, default="")
     parser.add_argument("--group-weights", type=str, default="")
+    parser.add_argument("--group-betas", type=str, default="")
+    parser.add_argument("--group-lams", type=str, default="")
     return parser.parse_args()
 
 
@@ -67,12 +71,20 @@ def main() -> None:
     group_means = parse_float_list(args.group_delta_pi_means)
     group_sds = parse_float_list(args.group_delta_pi_sds)
     group_weights = parse_float_list(args.group_weights)
+    group_betas = parse_float_list(args.group_betas)
+    group_lams = parse_float_list(args.group_lams)
 
     if group_labels:
         if not (len(group_labels) == len(group_means) == len(group_sds)):
             raise ValueError("Group labels, means, and sds must have matching lengths.")
         if group_weights and len(group_weights) != len(group_labels):
             raise ValueError("Group weights must match number of group labels.")
+        if group_betas and len(group_betas) != len(group_labels):
+            raise ValueError("Group betas must match number of group labels.")
+        if group_lams and len(group_lams) != len(group_labels):
+            raise ValueError("Group lams must match number of group labels.")
+    elif group_betas or group_lams:
+        raise ValueError("Group betas/lams require group labels.")
         weights = np.array(group_weights) if group_weights else np.ones(len(group_labels))
         weights = weights / weights.sum()
         group_sizes = rng.multinomial(args.n_subjects, weights)
@@ -90,7 +102,12 @@ def main() -> None:
         delta_pi = args.delta_pi_sd * z_delta
         groups = ["all"] * args.n_subjects
 
-    params = ModelParams(b=args.plateau_frac * abs(ModelParams().m))
+    m_value = args.m if args.m is not None else ModelParams().m
+    if args.plateau_b is not None:
+        b_value = args.plateau_b
+    else:
+        b_value = args.plateau_frac * abs(m_value)
+    params = ModelParams(m=m_value, b=b_value)
 
     subjects = [
         SubjectConfig(
@@ -98,8 +115,12 @@ def main() -> None:
             r_post1=float(r_post1[i]),
             delta_pi=float(delta_pi[i]),
             model=args.model,
-            beta=args.beta,
-            lam=args.lam,
+            beta=group_betas[group_labels.index(groups[i])]
+            if group_betas
+            else args.beta,
+            lam=group_lams[group_labels.index(groups[i])]
+            if group_lams
+            else args.lam,
             group=groups[i],
         )
         for i in range(args.n_subjects)
@@ -126,6 +147,7 @@ def main() -> None:
                     "beta": cfg.beta,
                     "lam": cfg.lam,
                     "plateau_b": params.b,
+                    "m": params.m,
                     "group": cfg.group,
                     "delta_pi_metric": args.delta_pi_metric,
                 }
@@ -139,9 +161,10 @@ def main() -> None:
             "delta_pi": delta_pi,
             "r_measure": r_values,
             "model": args.model,
-            "beta": args.beta,
-            "lam": args.lam,
+            "beta": [s.beta for s in subjects],
+            "lam": [s.lam for s in subjects],
             "plateau_b": params.b,
+            "m": params.m,
             "group": groups,
             "delta_pi_metric": args.delta_pi_metric,
         }

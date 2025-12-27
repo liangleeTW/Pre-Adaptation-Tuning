@@ -42,6 +42,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--delta-pi-sds", type=str, default="0.5,1.0,1.6")
     parser.add_argument("--rhos", type=str, default="0.0,0.3,0.6")
     parser.add_argument("--plateau-fracs", type=str, default="0.0,0.15")
+    parser.add_argument("--plateau-bs", type=str, default="")
+    parser.add_argument("--m", type=float, default=None)
     parser.add_argument("--seeds", type=str, default="0,1")
     parser.add_argument("--r-mean", type=float, default=1.0)
     parser.add_argument("--r-log-sd", type=float, default=0.3)
@@ -57,6 +59,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--group-delta-pi-means", type=str, default="")
     parser.add_argument("--group-delta-pi-sds", type=str, default="")
     parser.add_argument("--group-weights", type=str, default="")
+    parser.add_argument("--group-betas", type=str, default="")
+    parser.add_argument("--group-lams", type=str, default="")
     return parser.parse_args()
 
 
@@ -69,18 +73,27 @@ def main() -> None:
     delta_pi_sds = parse_float_list(args.delta_pi_sds)
     rhos = parse_float_list(args.rhos)
     plateau_fracs = parse_float_list(args.plateau_fracs)
+    plateau_bs = parse_float_list(args.plateau_bs)
     seeds = parse_int_list(args.seeds)
 
     group_labels = [g.strip() for g in args.group_labels.split(",") if g.strip()]
     group_means = parse_float_list(args.group_delta_pi_means)
     group_sds = parse_float_list(args.group_delta_pi_sds)
     group_weights = parse_float_list(args.group_weights)
+    group_betas = parse_float_list(args.group_betas)
+    group_lams = parse_float_list(args.group_lams)
 
     if group_labels:
         if not (len(group_labels) == len(group_means) == len(group_sds)):
             raise ValueError("Group labels, means, and sds must have matching lengths.")
         if group_weights and len(group_weights) != len(group_labels):
             raise ValueError("Group weights must match number of group labels.")
+        if group_betas and len(group_betas) != len(group_labels):
+            raise ValueError("Group betas must match number of group labels.")
+        if group_lams and len(group_lams) != len(group_labels):
+            raise ValueError("Group lams must match number of group labels.")
+    elif group_betas or group_lams:
+        raise ValueError("Group betas/lams require group labels.")
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -105,7 +118,11 @@ def main() -> None:
             for lam in model_lams:
                 for delta_sd in delta_pi_sds:
                     for rho in rhos:
-                        for plateau in plateau_fracs:
+                        plateau_values = plateau_bs or [
+                            frac * abs(args.m if args.m is not None else ModelParams().m)
+                            for frac in plateau_fracs
+                        ]
+                        for plateau_b in plateau_values:
                             for seed in seeds:
                                 rng = np.random.default_rng(seed)
                                 z_r, z_delta = sample_correlated_normals(
@@ -137,7 +154,8 @@ def main() -> None:
                                     groups = ["all"] * args.n_subjects
 
                                 params = ModelParams(
-                                    b=plateau * abs(ModelParams().m),
+                                    m=args.m if args.m is not None else ModelParams().m,
+                                    b=plateau_b,
                                 )
 
                                 subjects = [
@@ -146,8 +164,12 @@ def main() -> None:
                                         r_post1=float(r_post1[i]),
                                         delta_pi=float(delta_pi[i]),
                                         model=model,
-                                        beta=beta,
-                                        lam=lam,
+                                        beta=group_betas[group_labels.index(groups[i])]
+                                        if group_betas
+                                        else beta,
+                                        lam=group_lams[group_labels.index(groups[i])]
+                                        if group_lams
+                                        else lam,
                                         group=groups[i],
                                     )
                                     for i in range(args.n_subjects)
@@ -161,7 +183,7 @@ def main() -> None:
                                 run_name = (
                                     f"{model}_b{format_float(beta)}_l{format_float(lam)}"
                                     f"_d{format_float(delta_sd)}_r{format_float(rho)}"
-                                    f"_p{format_float(plateau)}_s{seed}"
+                                    f"_p{format_float(plateau_b / abs(params.m) if abs(params.m) > 0 else 0.0)}_s{seed}"
                                 )
                                 run_dir = outdir / f"run_{run_id:04d}_{run_name}"
                                 run_dir.mkdir(parents=True, exist_ok=True)
@@ -185,6 +207,7 @@ def main() -> None:
                                                 "beta": cfg.beta,
                                                 "lam": cfg.lam,
                                                 "plateau_b": params.b,
+                                                "m": params.m,
                                                 "group": cfg.group,
                                                 "delta_pi_metric": args.delta_pi_metric,
                                             }
@@ -199,9 +222,10 @@ def main() -> None:
                                         "r_measure": r_values,
                                         "group": groups,
                                         "model": model,
-                                        "beta": beta,
-                                        "lam": lam,
+                                        "beta": [s.beta for s in subjects],
+                                        "lam": [s.lam for s in subjects],
                                         "plateau_b": params.b,
+                                        "m": params.m,
                                         "delta_pi_metric": args.delta_pi_metric,
                                     }
                                 )
@@ -218,12 +242,14 @@ def main() -> None:
                                         "lam": lam,
                                         "delta_pi_sd": delta_sd,
                                         "rho": rho,
-                                        "plateau_frac": plateau,
+                                        "plateau_frac": plateau_b / abs(params.m) if abs(params.m) > 0 else 0.0,
+                                        "plateau_b": plateau_b,
                                         "seed": seed,
                                         "n_subjects": args.n_subjects,
                                         "n_trials": args.n_trials,
                                         "r_mean": args.r_mean,
                                         "r_log_sd": args.r_log_sd,
+                                        "m": params.m,
                                         "group_labels": ",".join(group_labels) if group_labels else "",
                                         "group_delta_pi_means": ",".join(
                                             f"{v:.3f}" for v in group_means
@@ -239,6 +265,16 @@ def main() -> None:
                                             f"{v:.3f}" for v in group_weights
                                         )
                                         if group_weights
+                                        else "",
+                                        "group_betas": ",".join(
+                                            f"{v:.3f}" for v in group_betas
+                                        )
+                                        if group_betas
+                                        else "",
+                                        "group_lams": ",".join(
+                                            f"{v:.3f}" for v in group_lams
+                                        )
+                                        if group_lams
                                         else "",
                                         "delta_pi_metric": args.delta_pi_metric,
                                         "output_dir": str(run_dir),
