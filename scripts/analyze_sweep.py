@@ -23,6 +23,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sweep-dir", type=str, default="data/sim_sweep")
     parser.add_argument("--early-trials", type=int, default=10)
     parser.add_argument("--late-trials", type=int, default=10)
+    parser.add_argument("--policy-delta-pi-sd", type=float, default=None)
+    parser.add_argument("--policy-rho", type=float, default=None)
+    parser.add_argument("--policy-plateau-frac", type=float, default=None)
+    parser.add_argument("--policy-seed", type=int, default=None)
+    parser.add_argument("--policy-bins", type=int, default=12)
     return parser.parse_args()
 
 
@@ -76,6 +81,10 @@ def compute_run_summary(run_dir: Path, early_trials: int, late_trials: int) -> d
             group_subjects = subjects[subjects["group"] == group]
             group_metrics[f"group_{safe}_delta_pi_mean"] = float(group_subjects["delta_pi"].mean())
             group_metrics[f"group_{safe}_delta_pi_sd"] = float(group_subjects["delta_pi"].std(ddof=1))
+            group_metrics[f"group_{safe}_r_measure_mean"] = float(group_subjects["r_measure"].mean())
+            group_metrics[f"group_{safe}_k_early"] = float(
+                group_trials[group_trials["trial"] <= early_trials]["kalman_gain"].mean()
+            )
 
     return {
         "early_mean_error": early_mean_error,
@@ -404,6 +413,195 @@ def plot_group_combined_strengths(summary: pd.DataFrame, outdir: Path) -> None:
     plt.close(fig)
 
 
+def parse_group_values(value: str) -> list[float]:
+    if not isinstance(value, str) or not value.strip():
+        return []
+    return [float(x) for x in value.split(",") if x.strip()]
+
+
+def parse_group_labels(value: str) -> list[str]:
+    if not isinstance(value, str) or not value.strip():
+        return []
+    return [x.strip() for x in value.split(",") if x.strip()]
+
+
+def build_group_long(summary: pd.DataFrame, index: pd.DataFrame) -> pd.DataFrame:
+    group_cols = [c for c in summary.columns if c.startswith("group_") and c.endswith("_delta_pi_mean")]
+    meta = index[["run_id", "group_labels", "group_lams"]].copy()
+    merged = summary.merge(meta, on="run_id", how="left")
+    rows = []
+    for _, row in merged.iterrows():
+        labels = parse_group_labels(row.get("group_labels", ""))
+        lams = parse_group_values(row.get("group_lams", ""))
+        lam_map = (
+            {sanitize_label(label): lams[idx] for idx, label in enumerate(labels)}
+            if labels and lams
+            else {}
+        )
+        for col in group_cols:
+            group_label = col[len("group_") : -len("_delta_pi_mean")]
+            rows.append(
+                {
+                    "run_id": row["run_id"],
+                    "model": row["model"],
+                    "beta": row["beta"],
+                    "lam": row["lam"],
+                    "group": group_label,
+                    "delta_pi_mean": row[col],
+                    "r_measure_mean": row.get(f"group_{group_label}_r_measure_mean", np.nan),
+                    "k_early": row.get(f"group_{group_label}_k_early", np.nan),
+                    "lam_group": lam_map.get(group_label, np.nan),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def plot_r_mapping_regimes(summary: pd.DataFrame, index: pd.DataFrame, outdir: Path) -> None:
+    long_df = build_group_long(summary, index)
+    if long_df.empty:
+        return
+
+    m2 = long_df[long_df["model"] == "M2"].copy()
+    if m2.empty:
+        return
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    group_colors = {"ec": "#1b6f8a", "eoplus": "#7a2d2d", "eominus": "#5b2c83"}
+    sign_markers = {1: "o", 0: "s", -1: "^"}
+    sign_labels = {1: "lambda > 0", 0: "lambda = 0", -1: "lambda < 0"}
+
+    m2 = m2[m2["lam_group"].notna()]
+    if m2.empty:
+        return
+
+    m2["lam_sign"] = np.sign(m2["lam_group"]).astype(int)
+    grouped = m2.groupby(["group", "lam_sign"])[["delta_pi_mean", "r_measure_mean"]].mean().reset_index()
+
+    for _, row in grouped.iterrows():
+        color = group_colors.get(row["group"], "#444444")
+        marker = sign_markers.get(row["lam_sign"], "o")
+        ax.scatter(
+            row["delta_pi_mean"],
+            row["r_measure_mean"],
+            color=color,
+            marker=marker,
+            s=70,
+            edgecolor="none",
+        )
+        ax.annotate(
+            row["group"],
+            (row["delta_pi_mean"], row["r_measure_mean"]),
+            textcoords="offset points",
+            xytext=(4, 4),
+            fontsize=9,
+            color=color,
+        )
+
+    ax.axvline(0, color="#444444", lw=1, ls="--")
+    ax.set_xlabel("Mean Δπ (group)")
+    ax.set_ylabel("Mean R measure (group)")
+    ax.set_title("Measurement Noise vs Δπ (M2 Regimes)")
+    group_handles = [
+        plt.Line2D([0], [0], marker="o", color="none", markerfacecolor=group_colors.get(label, "#444444"), markersize=8, label=label)
+        for label in ["ec", "eoplus", "eominus"]
+        if label in grouped["group"].unique().tolist()
+    ]
+    sign_handles = [
+        plt.Line2D([0], [0], marker=sign_markers[key], color="#444444", linestyle="None", markersize=8, label=sign_labels[key])
+        for key in [-1, 0, 1]
+        if key in grouped["lam_sign"].unique().tolist()
+    ]
+    ax.legend(handles=group_handles + sign_handles, frameon=False, ncol=2)
+    fig.tight_layout()
+    fig.savefig(outdir / "r_mapping_regimes_m2.png", dpi=160)
+    plt.close(fig)
+
+
+def plot_policy_family(
+    trials: pd.DataFrame,
+    outdir: Path,
+    early_trials: int,
+    model: str,
+    strength_col: str,
+    filename: str,
+    title: str,
+    bins: int,
+) -> None:
+    if trials.empty:
+        return
+    sub = trials[trials["model"] == model]
+    if sub.empty or strength_col not in sub.columns:
+        return
+
+    early = sub[sub["trial"] <= early_trials]
+    k_by_subject = (
+        early.groupby(["subject", strength_col])["kalman_gain"]
+        .mean()
+        .reset_index()
+        .rename(columns={"kalman_gain": "k_early"})
+    )
+    delta_by_subject = (
+        early.drop_duplicates(["subject", strength_col])[
+            ["subject", strength_col, "delta_pi"]
+        ]
+        .rename(columns={"delta_pi": "delta_pi"})
+    )
+    merged = k_by_subject.merge(delta_by_subject, on=["subject", strength_col], how="inner")
+    if merged.empty:
+        return
+
+    bins = max(4, int(bins))
+    edges = np.linspace(merged["delta_pi"].min(), merged["delta_pi"].max(), bins + 1)
+    merged["bin"] = pd.cut(merged["delta_pi"], edges, include_lowest=True)
+    grouped = (
+        merged.groupby([strength_col, "bin"])
+        .agg(delta_pi=("delta_pi", "mean"), k_early=("k_early", "mean"))
+        .reset_index()
+    )
+
+    strengths = sorted(grouped[strength_col].unique().tolist())
+    if not strengths:
+        return
+
+    cmap = plt.get_cmap("coolwarm")
+    norm = plt.Normalize(vmin=min(strengths), vmax=max(strengths))
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    for strength in strengths:
+        rows = grouped[grouped[strength_col] == strength].sort_values("delta_pi")
+        color = cmap(norm(strength))
+        ax.plot(
+            rows["delta_pi"],
+            rows["k_early"],
+            marker="o",
+            lw=2,
+            color=color,
+            label=f"{strength_col}={strength:g}",
+        )
+
+    ax.axvline(0, color="#444444", lw=1, ls="--")
+    ax.set_xlabel("Δπ (binned)")
+    ax.set_ylabel("Mean early Kalman gain")
+    ax.set_title(title)
+    ax.legend(frameon=False, ncol=2)
+    fig.tight_layout()
+    fig.savefig(outdir / filename, dpi=160)
+    plt.close(fig)
+
+
+def filter_policy_index(index: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
+    policy = index.copy()
+    if args.policy_delta_pi_sd is not None:
+        policy = policy[policy["delta_pi_sd"] == args.policy_delta_pi_sd]
+    if args.policy_rho is not None:
+        policy = policy[policy["rho"] == args.policy_rho]
+    if args.policy_plateau_frac is not None:
+        policy = policy[policy["plateau_frac"] == args.policy_plateau_frac]
+    if args.policy_seed is not None:
+        policy = policy[policy["seed"] == args.policy_seed]
+    return policy
+
+
 def main() -> None:
     args = parse_args()
     sweep_dir = Path(args.sweep_dir)
@@ -439,7 +637,9 @@ def main() -> None:
     trials_all = []
     for _, row in index.iterrows():
         run_dir = Path(row["output_dir"])
-        trials_all.append(pd.read_csv(run_dir / "sim_trials.csv"))
+        trials_df = pd.read_csv(run_dir / "sim_trials.csv")
+        trials_df["run_id"] = row["run_id"]
+        trials_all.append(trials_df)
     trials_df = pd.concat(trials_all, ignore_index=True)
 
     fig_dir = sweep_dir / "figures"
@@ -455,6 +655,33 @@ def main() -> None:
     plot_group_strength_effects(summary_df, fig_dir)
     plot_group_comparison(summary_df, fig_dir)
     plot_group_combined_strengths(summary_df, fig_dir)
+    policy_index = filter_policy_index(index, args)
+    policy_run_ids = set(policy_index["run_id"].tolist())
+    policy_summary = summary_df[summary_df["run_id"].isin(policy_run_ids)]
+    policy_trials = trials_df[trials_df["run_id"].isin(policy_run_ids)]
+    if not policy_summary.empty:
+        plot_r_mapping_regimes(policy_summary, policy_index, fig_dir)
+    if not policy_trials.empty:
+        plot_policy_family(
+            policy_trials,
+            fig_dir,
+            args.early_trials,
+            model="M2",
+            strength_col="lam",
+            filename="policy_family_lambda.png",
+            title="Policy Family Across Lambda (Mean Early Gain)",
+            bins=args.policy_bins,
+        )
+        plot_policy_family(
+            policy_trials,
+            fig_dir,
+            args.early_trials,
+            model="M1",
+            strength_col="beta",
+            filename="policy_family_beta.png",
+            title="Policy Family Across Beta (Mean Early Gain)",
+            bins=args.policy_bins,
+        )
 
     print(f"Wrote {summary_path} and figures to {fig_dir}")
 

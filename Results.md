@@ -159,6 +159,33 @@ indicating better identifiability for the bounded modulation model under
 realistic tuning overlap. Biases remain substantial, motivating further
 recovery checks and potential model refinements before real-data fitting.
 
+### 3.8 Policy-Family Visual Checks (Group-Specific Grids)
+
+These are exploratory plots to see whether the simulated data reproduce the
+theoretical “policy family” shapes (note3/note4) when group-specific \(\lambda\)
+or \(\beta\) are used. Runs were generated with empirical group \(\Delta\pi\)
+means/SDs and a grid of group-specific parameters.
+
+Outputs:
+- `data/sim_sweep_group_lam_grid/figures/policy_family_lambda.png`
+- `data/sim_sweep_group_lam_grid/figures/r_mapping_regimes_m2.png`
+- `data/sim_sweep_group_beta_grid/figures/policy_family_beta.png`
+
+Interpretation notes:
+- Policy-family plots show mean early Kalman gain vs binned \(\Delta\pi\) for
+  each \(\lambda\)/\(\beta\) set. With group-specific parameters, curves are
+  primarily separated vertically (different gain regimes) rather than showing
+  strong within-curve slopes because each group’s \(\Delta\pi\) range is narrow
+  and positive.
+- The M2 regime plot shows mean group \(\Delta\pi\) vs mean \(R\), with marker
+  shapes indicating \(\lambda\) sign and colors indicating group. This is a
+  compact check that the sign of \(\lambda\) flips the mapping direction between
+  precision change and measurement noise.
+
+These plots are placeholders for documentation. If we want the classic
+note4-style “fan” across \(\Delta\pi\), we should use a global-\(\lambda\) sweep
+or inflate \(\Delta\pi\) dispersion to span both negative and positive ranges.
+
 ## 4. Real-Data Fitting (Plan.md Section 4)
 
 Status: not started. The simulation phase now includes recovery fitting on

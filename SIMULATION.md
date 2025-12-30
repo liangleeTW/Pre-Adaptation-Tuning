@@ -102,6 +102,55 @@ Use `--delta-pi-metric logpi` to interpret the tuning variable as Δlog precisio
 instead of Δprecision. This only changes interpretation; the simulation uses the
 provided values directly.
 
+## Group-specific modulation grids (lambda/beta)
+
+You can sweep multiple *group-specific* \(\lambda\) (M2) or \(\beta\) (M1) sets.
+This is useful for testing whether groups follow different policy regimes.
+
+The grid format is a semicolon-separated list of group-specific parameter sets
+in the same order as `--group-labels`.
+
+Example (M2, group-specific lambda grid):
+
+```bash
+uv run ./scripts/run_sweep.py \
+  --models M2 \
+  --lams 0.0 \
+  --group-labels EC,EO+,EO- \
+  --group-delta-pi-means 0.198,0.096,0.062 \
+  --group-delta-pi-sds 0.377,0.237,0.248 \
+  --group-weights 0.362,0.333,0.304 \
+  --group-lams-grid "0.8,0.0,-0.8;0.6,0.0,-0.6;0.4,0.0,-0.4;0.2,0.0,-0.2" \
+  --delta-pi-sds 1.5 \
+  --rhos 0.0 \
+  --plateau-fracs 0.0 \
+  --n-seeds 10 \
+  --outdir data/sim_sweep_group_lam_grid
+```
+
+Example (M1, group-specific beta grid):
+
+```bash
+uv run ./scripts/run_sweep.py \
+  --models M1 \
+  --betas 0.0 \
+  --group-labels EC,EO+,EO- \
+  --group-delta-pi-means 0.198,0.096,0.062 \
+  --group-delta-pi-sds 0.377,0.237,0.248 \
+  --group-weights 0.362,0.333,0.304 \
+  --group-betas-grid "0.5,0.0,-0.5;0.3,0.0,-0.3;0.2,0.0,-0.2" \
+  --delta-pi-sds 1.5 \
+  --rhos 0.0 \
+  --plateau-fracs 0.0 \
+  --n-seeds 10 \
+  --outdir data/sim_sweep_group_beta_grid
+```
+
+Notes:
+- `--lams 0.0` / `--betas 0.0` keeps the global grid at a single value while the
+  group-specific grid does the sweep.
+- `--n-seeds N` auto-generates seeds `0..N-1`.
+
 ## One-command sweep from data
 
 If you have run `scripts/plot_delta_pi_groups.py`, you can launch a sweep using
