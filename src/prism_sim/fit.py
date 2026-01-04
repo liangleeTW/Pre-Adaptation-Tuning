@@ -40,4 +40,11 @@ def loglik_subject(errors: Iterable[float], params: ModelParams, r_measure: floa
 
 def stack_errors(trials_df, subject_col: str = "subject") -> dict[int, np.ndarray]:
     grouped = trials_df.groupby(subject_col)["error"]
-    return {int(subject): group.values for subject, group in grouped}
+    result = {}
+    for subject, group in grouped:
+        try:
+            key = int(subject)
+        except (TypeError, ValueError):
+            key = subject
+        result[key] = group.values
+    return result

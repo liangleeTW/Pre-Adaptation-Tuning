@@ -30,6 +30,13 @@ Because \(\Delta\pi_i\) is signed, the sign of the modulation parameter (especia
 
 This sign directly shapes predicted group differences. If the tuning manipulation reliably shifts \(\Delta\pi\) by group, the expected ordering of early adaptation rates should flip under \(\lambda>0\) vs \(\lambda<0\). Distinguishing these regimes is central to the interpretive payoff of the experiment.
 
+#### Competing \(\lambda\) regimes (reliability vs source-estimation)
+
+- **Reliability-based route (\(\lambda>0\))**: sharper proprioception (positive \(\Delta\pi\)) lowers \(R_i\), increasing Kalman gain and speeding early adaptation. Groups with larger positive \(\Delta\pi\) should sit highest in early learning; negative \(\Delta\pi\) groups should be slowest.
+- **Source-estimation route (\(\lambda<0\))**: sharper proprioception increases the tendency to attribute errors to external causes, effectively inflating \(R_i\) and dampening gains. The group ordering in early adaptation should invert relative to the \(\lambda>0\) regime.
+
+Planned fits (Section 4) explicitly estimate group-specific \(\lambda_g\) to adjudicate which route the data support. Early-trial group ordering serves as an interpretable cross-check against these two sign-specific predictions (see note3 schematic).
+
 ---
 
 ### 1.3 Modeling Perspective

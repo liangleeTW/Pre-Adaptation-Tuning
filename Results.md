@@ -188,9 +188,20 @@ or inflate \(\Delta\pi\) dispersion to span both negative and positive ranges.
 
 ## 4. Real-Data Fitting (Plan.md Section 4)
 
-Status: not started. The simulation phase now includes recovery fitting on
-simulated data; real-data fitting awaits integration of adaptation-phase error
-trials.
+Latest run (NumPyro, group-specific modulation, shared plateau, Δπ, n=69, 2000/2000 draws/tune, chains=4):
+- M0: WAIC ≈ 1.29e7, b ≈ 18.75
+- M1: WAIC ≈ 1.14e7 (lowest), β_EC ≈ 0.68, β_EO+ ≈ -0.87, β_EO- ≈ 2.03, b ≈ 18.71
+- M2: WAIC ≈ 1.20e7; λ_EO+ ≈ 0.96 (Pr>0=1.0), λ_EC ≈ -0.75 (Pr>0=0), λ_EO- ≈ -1.32 (Pr>0=0); b ≈ 18.75
+
+Interpretation:
+- Model comparison: M1 currently fits best by WAIC; M2 trails M1 but improves over M0.
+- λ signs are group-dependent (EO+ positive, EC/EO− negative), suggesting heterogeneous routes: EO+ aligns with reliability-based mapping, EC/EO− with source-estimation mapping.
+- Plateaus are similar across groups in the shared-b run; group-specific b not yet tested in the NumPyro fit.
+
+Pending follow-ups:
+- Re-run M2 with group-specific plateau and/or Δlogπ to test robustness of the λ pattern and WAIC.
+- Inspect Pareto k diagnostics and PPCs; increase draws if needed for WAIC/LOO stability.
+- Early-trial predictive ordering by group to see if it matches the mixed λ signs (EO+ faster, EC/EO− slower).
 
 ## 5. Visualization Outputs
 
