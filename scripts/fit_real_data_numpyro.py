@@ -102,23 +102,65 @@ def model_numpyro(model_name: str, errors: jnp.ndarray, group_idx: jnp.ndarray, 
         b = numpyro.sample("b", dist.Normal(0.0, 30.0))
         b_subj = jnp.repeat(b, len(group_idx))
 
+    model_name = model_name.upper()
+    q_modulated = False  # Flag to track if Q is per-subject
+
     if model_name == "M0":
         beta = None
         lam = None
         r_measure = r_post1
+        q_measure = Q  # Scalar Q
     elif model_name == "M1":
         beta = numpyro.sample("beta", dist.Normal(0.0, 1.0).expand((n_groups,)))
         r_measure = r_post1 + beta[group_idx] * delta_pi
         lam = None
+        q_measure = Q  # Scalar Q
+    elif model_name in {"M1EXP", "M1-EXP", "M1LOG"}:
+        beta = numpyro.sample("beta", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        r_measure = r_post1 * jnp.exp(beta[group_idx] * delta_pi)
+        lam = None
+        q_measure = Q  # Scalar Q
+    elif model_name in {"M1ASYM", "M1-ASYM"}:
+        beta_pos = numpyro.sample("beta_pos", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        beta_neg = numpyro.sample("beta_neg", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        scale = 1.0 + beta_pos[group_idx] * jnp.maximum(delta_pi, 0.0) + beta_neg[group_idx] * jnp.minimum(delta_pi, 0.0)
+        scale = jnp.clip(scale, 1e-6, 1e6)
+        r_measure = r_post1 * scale
+        beta = beta_pos
+        lam = beta_neg  # store in lam slot for convenience downstream
+        q_measure = Q  # Scalar Q
+    elif model_name in {"MQ", "M-Q"}:
+        # M-Q: Process noise modulation only, R stays fixed
+        beta_q = numpyro.sample("beta_q", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        r_measure = r_post1  # R stays at baseline
+        q_measure = Q * jnp.exp(beta_q[group_idx] * delta_pi)  # Q modulated per subject
+        q_modulated = True
+        beta = None
+        lam = beta_q  # Store beta_q in lam slot for downstream reporting
+    elif model_name in {"MHYBRID", "M-HYBRID"}:
+        # M-hybrid: Both R and Q modulated
+        beta_r = numpyro.sample("beta_r", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        beta_q = numpyro.sample("beta_q", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        r_measure = r_post1 * jnp.exp(beta_r[group_idx] * delta_pi)
+        q_measure = Q * jnp.exp(beta_q[group_idx] * delta_pi)
+        q_modulated = True
+        beta = beta_r  # Store beta_r in beta slot
+        lam = beta_q   # Store beta_q in lam slot
     else:  # M2
         lam = numpyro.sample("lam", dist.Normal(0.0, 0.5).expand((n_groups,)))
         lam_t = jnp.tanh(lam)
         r_measure = r_post1 * (1.0 - lam_t[group_idx] * jnp.tanh(delta_pi))
         beta = None
+        q_measure = Q  # Scalar Q
 
     # Vectorized likelihood computation across subjects (fast)
-    vectorized_kalman = vmap(kalman_loglik, in_axes=(0, 0, None, None, None, 0))
-    logliks = vectorized_kalman(errors, r_measure, m, A, Q, b_subj)
+    # If Q is modulated, use per-subject Q (axis 0); otherwise scalar Q (axis None)
+    if q_modulated:
+        vectorized_kalman = vmap(kalman_loglik, in_axes=(0, 0, None, None, 0, 0))
+        logliks = vectorized_kalman(errors, r_measure, m, A, q_measure, b_subj)
+    else:
+        vectorized_kalman = vmap(kalman_loglik, in_axes=(0, 0, None, None, None, 0))
+        logliks = vectorized_kalman(errors, r_measure, m, A, q_measure, b_subj)
 
     # Add total log-likelihood to model
     numpyro.factor("obs", jnp.sum(logliks))
@@ -177,7 +219,7 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame, args: arg
     )
 
     # Compute convergence diagnostics
-    convergence_summary = az.summary(idata, var_names=["b", "beta", "lam"], filter_vars="like")
+    convergence_summary = az.summary(idata, var_names=["b", "beta", "beta_r", "beta_q", "lam"], filter_vars="like")
     max_rhat = convergence_summary["r_hat"].max() if "r_hat" in convergence_summary else np.nan
     min_ess_bulk = convergence_summary["ess_bulk"].min() if "ess_bulk" in convergence_summary else np.nan
     min_ess_tail = convergence_summary["ess_tail"].min() if "ess_tail" in convergence_summary else np.nan
@@ -243,6 +285,26 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame, args: arg
         for g, val in enumerate(beta_med):
             summary[f"beta_{group_labels[g]}"] = float(val)
 
+    if "beta_pos" in post:
+        beta_pos_med = np.median(np.array(post["beta_pos"]), axis=0)
+        for g, val in enumerate(beta_pos_med):
+            summary[f"beta_pos_{group_labels[g]}"] = float(val)
+
+    if "beta_neg" in post:
+        beta_neg_med = np.median(np.array(post["beta_neg"]), axis=0)
+        for g, val in enumerate(beta_neg_med):
+            summary[f"beta_neg_{group_labels[g]}"] = float(val)
+
+    if "beta_r" in post:
+        beta_r_med = np.median(np.array(post["beta_r"]), axis=0)
+        for g, val in enumerate(beta_r_med):
+            summary[f"beta_r_{group_labels[g]}"] = float(val)
+
+    if "beta_q" in post:
+        beta_q_med = np.median(np.array(post["beta_q"]), axis=0)
+        for g, val in enumerate(beta_q_med):
+            summary[f"beta_q_{group_labels[g]}"] = float(val)
+
     # FIXED: Report tanh-transformed lambda (the actual parameter in the model)
     if "lam" in post:
         lam_raw = np.array(post["lam"])  # Raw unconstrained parameter
@@ -267,6 +329,18 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame, args: arg
         lam_transformed = np.tanh(lam_raw)
         for g in range(lam_transformed.shape[-1]):
             summary[f"Pr_lam_gt0_{group_labels[g]}"] = float((lam_transformed[:, g] > 0).mean())
+
+    # Sign prob for beta_q if present
+    if "beta_q" in post:
+        beta_q_array = np.array(post["beta_q"])
+        for g in range(beta_q_array.shape[-1]):
+            summary[f"Pr_beta_q_gt0_{group_labels[g]}"] = float((beta_q_array[:, g] > 0).mean())
+
+    # Sign prob for beta_r if present
+    if "beta_r" in post:
+        beta_r_array = np.array(post["beta_r"])
+        for g in range(beta_r_array.shape[-1]):
+            summary[f"Pr_beta_r_gt0_{group_labels[g]}"] = float((beta_r_array[:, g] > 0).mean())
 
     return summary
 

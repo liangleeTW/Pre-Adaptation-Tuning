@@ -1,0 +1,7 @@
+model,max_rhat,min_ess_bulk,min_ess_tail,converged
+M-HYBRID,1.53,7.0,27.0,False
+M-Q,1.53,7.0,28.0,False
+M0,1.0,7335.0,5480.0,True
+M1,1.0,10745.0,5343.0,True
+M1-EXP,1.0,10442.0,5543.0,True
+M2,1.0,10837.0,4887.0,True
