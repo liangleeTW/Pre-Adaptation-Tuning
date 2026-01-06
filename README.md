@@ -113,8 +113,8 @@ After running the pipeline, find results in:
 
 ## Contributors
 
-<a href="https://github.com/sizluluEZ"><img src="https://github.com/sizluluEZ" width="50px;" alt="username1"/></a>
-<a href="https://github.com/liangleeTW"><img src="https://github.com/liangleeTW" width="50px;" alt="username2"/></a>
+<a href="https://github.com/sizluluEZ"><img src="https://avatars.githubusercontent.com/u/132829530?v=4" width="50px;" alt="sizluluEZ"/></a>
+<a href="https://github.com/liangleeTW"><img src="https://avatars.githubusercontent.com/u/52850586?v=4" width="50px;" alt="liangleeTW"/></a>
 
 
 ## Citation
