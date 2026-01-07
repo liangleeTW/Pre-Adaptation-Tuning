@@ -119,7 +119,7 @@ def plot(df: pd.DataFrame, metric_label: str, k_stat: str, save_pdf: bool):
 def main():
     ap = argparse.ArgumentParser(description="Plot Δ vs Kalman gain K for M1/M2.")
     ap.add_argument("--metric", choices=["pi", "logpi"], default="pi")
-    ap.add_argument("--fit-path", default="data/derived/real_fit_numpyro_optimized.csv")
+    ap.add_argument("--fit-path", default="data/derived/real_fit_numpyro.csv")
     ap.add_argument("--k-stat", choices=["steady", "first", "mean10"], default="steady")
     ap.add_argument("--no-pdf", action="store_true")
     args = ap.parse_args()

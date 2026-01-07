@@ -18,7 +18,7 @@ def load_data(metric: str = "pi") -> pd.DataFrame:
     return delta_df[["ID", "group", delta_col, "r_post1"]].rename(columns={"ID": "subject", delta_col: "delta"})
 
 
-def load_params(fit_path: str = "data/derived/real_fit_numpyro_optimized.csv") -> tuple[dict, dict]:
+def load_params(fit_path: str = "data/derived/real_fit_numpyro.csv") -> tuple[dict, dict]:
     """Return group-specific parameters for M1 (beta) and M2 (lambda)."""
     fit_results = pd.read_csv(fit_path)
 
@@ -152,7 +152,7 @@ def plot_delta_pi_vs_r(
 
 def main(
     metric: str = "pi",
-    fit_path: str = "data/derived/real_fit_numpyro_optimized.csv",
+    fit_path: str = "data/derived/real_fit_numpyro.csv",
     save_pdf: bool = True,
     y_var: str = "R",
     k_stat: str = "steady",
@@ -177,7 +177,7 @@ def main(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot Δ vs R for M1/M2.")
     parser.add_argument("--metric", choices=["pi", "logpi"], default="pi", help="Use Δπ or Δlogπ.")
-    parser.add_argument("--fit-path", default="data/derived/real_fit_numpyro_optimized.csv", help="Path to fit results.")
+    parser.add_argument("--fit-path", default="data/derived/real_fit_numpyro.csv", help="Path to fit results.")
     parser.add_argument("--no-pdf", action="store_true", help="Do not save PDF output.")
     parser.add_argument("--y", choices=["R", "K"], default="R", help="Plot R (noise) or K (Kalman gain).")
     parser.add_argument("--k-stat", choices=["steady", "first", "mean10"], default="steady", help="Gain summary when y=K.")

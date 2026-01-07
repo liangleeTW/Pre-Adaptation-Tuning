@@ -29,11 +29,9 @@ brew install poetry
 ### 3. Install Dependencies
 
 ```bash
-# Install project dependencies
-poetry install
-
 # Activate virtual environment
-poetry shell
+poetry init --python "^3.12" -q  # skip this if poetry.lock already exists
+poetry env use $(pyenv which python)
 ```
 
 ---
@@ -56,7 +54,7 @@ poetry run python scripts/modeling/fit_real_data_numpyro.py
 
 **Fit primary model (M2-dual):**
 ```bash
-poetry run python scripts/modeling/fit_real_data_m_obs.py
+poetry run python scripts/modeling/fit_real_data_m_obs.py --plateau-group-specific
 ```
 
 This produces:
@@ -102,11 +100,6 @@ After running the pipeline, find results in:
 ---
 
 ## Documentation
-
-- `VALIDATION_SUMMARY.md` - Full validation results and interpretation
-- `paper.txt` - Models subsection for Methods section
-- `STRUCTURE.md` - Repository organization guide
-- `FITTING.md` - Detailed methodology
 
 
 ---
