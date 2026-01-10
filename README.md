@@ -31,7 +31,10 @@ brew install poetry
 ```bash
 # Activate virtual environment
 poetry init --python "^3.12" -q  # skip this if poetry.lock already exists
-poetry env use $(pyenv which python)
+poetry config virtualenvs.in-project true
+poetry env use 3.12
+poetry install --sync
+source .venv/bin/activate
 ```
 
 ---
