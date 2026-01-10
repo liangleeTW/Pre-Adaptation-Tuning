@@ -61,7 +61,15 @@ def prepare_subject_table(delta_path: Path, metric: str, trials: pd.DataFrame) -
     )
     merged = merged.dropna(subset=["r_post1", delta_col])
 
+    # Include openloop and visual variance if available (for decomposed models)
     keep_cols = ["subject", "group", "r_post1", delta_col]
+    if "openloop_var_post1" in delta_df.columns:
+        keep_cols.append("openloop_var_post1")
+        merged = merged.dropna(subset=["openloop_var_post1"])
+    if "visual_var_post1" in delta_df.columns:
+        keep_cols.append("visual_var_post1")
+        merged = merged.dropna(subset=["visual_var_post1"])
+
     merged = merged[keep_cols].rename(columns={delta_col: "delta_pi"})
     if merged.empty:
         raise ValueError("No overlapping subjects between trials and delta file.")
@@ -129,8 +137,17 @@ def kalman_loglik_obs(errors: jnp.ndarray, r_state: float, r_obs: float,
 
 def model_numpyro_obs(model_name: str, errors: jnp.ndarray, group_idx: jnp.ndarray,
                       n_groups: int, r_post1: jnp.ndarray, delta_pi: jnp.ndarray,
-                      m: float, A: float, Q: float, plateau_group_specific: bool):
-    """M-obs model variants."""
+                      m: float, A: float, Q: float, plateau_group_specific: bool,
+                      r_openloop: jnp.ndarray = None, r_visual: jnp.ndarray = None):
+    """M-obs model variants.
+
+    Models:
+    - M-OBS-FIXED: Fixed R_obs, R_state = r_post1 (proprioceptive variance)
+    - M-OBS: R_obs modulated by Δπ, R_state = r_post1
+    - M-TWOR: Both R_state and R_obs modulated, R_obs_base is free parameter
+    - M-TWOR-OPENLOOP: Both modulated, R_obs_base = openloop variance (empirical)
+    - M-TWOR-SENSORY: R_obs = openloop + visual + R_cognitive (decomposed)
+    """
 
     # Plateau
     if plateau_group_specific:
@@ -175,6 +192,68 @@ def model_numpyro_obs(model_name: str, errors: jnp.ndarray, group_idx: jnp.ndarr
         r_obs_base = numpyro.sample("r_obs_base", dist.HalfNormal(2.0).expand((n_groups,)))
         r_obs_subj = r_obs_base[group_idx] * jnp.exp(beta_obs[group_idx] * delta_pi)
 
+    elif model_name == "M-TWOR-OPENLOOP":
+        # M-twoR with empirical R_obs baseline from openloop reaching variance
+        # Key difference: R_obs_base is NOT a free parameter, but measured from
+        # openloop reaching (no visual feedback) at post1.
+        #
+        # Cognitive rationale:
+        # - Openloop reaching variance = motor execution noise without vision
+        # - This is exactly what R_obs should capture: trial-to-trial scatter
+        #   that doesn't affect learning (Kalman gain)
+        # - Grounding R_obs in empirical data provides mechanistic validation
+
+        if r_openloop is None:
+            raise ValueError("M-TWOR-OPENLOOP requires openloop_var_post1 data")
+
+        beta_state = numpyro.sample("beta_state", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        beta_obs = numpyro.sample("beta_obs", dist.Normal(0.0, 1.0).expand((n_groups,)))
+
+        # R_state modulated (affects learning) - same as M-TWOR
+        r_state = r_post1 * jnp.exp(beta_state[group_idx] * delta_pi)
+
+        # R_obs modulated with EMPIRICAL baseline (openloop variance)
+        # No r_obs_base parameter - using measured openloop variance instead
+        r_obs_subj = r_openloop * jnp.exp(beta_obs[group_idx] * delta_pi)
+
+    elif model_name == "M-TWOR-SENSORY":
+        # M-twoR with decomposed R_obs into sensory and cognitive components
+        #
+        # R_obs = R_motor + R_visual + R_cognitive × exp(β_obs × Δlog π)
+        #
+        # Where:
+        # - R_motor = openloop_var_post1 (motor execution noise, fixed)
+        # - R_visual = visual_var_post1 (visual encoding noise, fixed)
+        # - R_cognitive = free parameter (attention, strategy, unmeasured factors)
+        #
+        # Cognitive rationale:
+        # - Sensory noise (motor + visual) should NOT be modulated by Δπ
+        # - Only cognitive factors (attention, strategy) are modulated
+        # - This tests whether proprioceptive tuning specifically affects
+        #   cognitive aspects of trial-to-trial variability
+
+        if r_openloop is None or r_visual is None:
+            raise ValueError("M-TWOR-SENSORY requires openloop_var_post1 and visual_var_post1 data")
+
+        beta_state = numpyro.sample("beta_state", dist.Normal(0.0, 1.0).expand((n_groups,)))
+        beta_obs = numpyro.sample("beta_obs", dist.Normal(0.0, 1.0).expand((n_groups,)))
+
+        # R_state modulated (affects learning) - same as M-TWOR
+        r_state = r_post1 * jnp.exp(beta_state[group_idx] * delta_pi)
+
+        # R_cognitive: free parameter for unmeasured cognitive factors
+        r_cognitive = numpyro.sample("r_cognitive", dist.HalfNormal(2.0).expand((n_groups,)))
+
+        # R_obs decomposed: sensory (fixed) + cognitive (modulated)
+        # Sensory components: motor execution + visual encoding
+        r_sensory = r_openloop + r_visual  # Fixed, empirical
+
+        # Cognitive component modulated by Δπ
+        r_cognitive_modulated = r_cognitive[group_idx] * jnp.exp(beta_obs[group_idx] * delta_pi)
+
+        # Total observation noise
+        r_obs_subj = r_sensory + r_cognitive_modulated
+
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -196,6 +275,16 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame,
     group_idx = subjects["group"].map(group_to_idx).to_numpy()
     r_post1 = subjects["r_post1"].to_numpy()
     delta_pi = subjects["delta_pi"].to_numpy()
+
+    # Get openloop variance if available (for M-TWOR-OPENLOOP and M-TWOR-SENSORY)
+    r_openloop = None
+    if "openloop_var_post1" in subjects.columns:
+        r_openloop = subjects["openloop_var_post1"].to_numpy()
+
+    # Get visual variance if available (for M-TWOR-SENSORY)
+    r_visual = None
+    if "visual_var_post1" in subjects.columns:
+        r_visual = subjects["visual_var_post1"].to_numpy()
 
     kernel = NUTS(
         model_numpyro_obs,
@@ -225,6 +314,8 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame,
         A=args.A,
         Q=args.Q,
         plateau_group_specific=args.plateau_group_specific,
+        r_openloop=jnp.asarray(r_openloop) if r_openloop is not None else None,
+        r_visual=jnp.asarray(r_visual) if r_visual is not None else None,
     )
 
     # Convert to InferenceData
@@ -233,7 +324,7 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame,
     idata = az.from_numpyro(mcmc, coords=coords, dims=dims)
 
     # Convergence diagnostics
-    convergence_summary = az.summary(idata, var_names=["b", "beta_state", "beta_obs", "r_obs", "r_obs_base"], filter_vars="like")
+    convergence_summary = az.summary(idata, var_names=["b", "beta_state", "beta_obs", "r_obs", "r_obs_base", "r_cognitive"], filter_vars="like")
     max_rhat = convergence_summary["r_hat"].max() if "r_hat" in convergence_summary else np.nan
     min_ess_bulk = convergence_summary["ess_bulk"].min() if "ess_bulk" in convergence_summary else np.nan
     min_ess_tail = convergence_summary["ess_tail"].min() if "ess_tail" in convergence_summary else np.nan
@@ -305,6 +396,11 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame,
         for g, val in enumerate(r_obs_base_med):
             summary[f"r_obs_base_{group_labels[g]}"] = float(val)
 
+    if "r_cognitive" in post:
+        r_cognitive_med = np.median(np.array(post["r_cognitive"]), axis=0)
+        for g, val in enumerate(r_cognitive_med):
+            summary[f"r_cognitive_{group_labels[g]}"] = float(val)
+
     b_med = np.median(np.array(post["b"]), axis=0)
     if np.ndim(b_med) == 0:
         summary["b"] = float(b_med)
@@ -320,7 +416,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--trials-path", type=Path, default=Path("data/derived/adaptation_trials.csv"))
     p.add_argument("--delta-path", type=Path, default=Path("data/derived/proprio_delta_pi.csv"))
     p.add_argument("--metric", choices=["pi", "logpi"], default="logpi")
-    p.add_argument("--models", type=str, default="M-obs-fixed,M-obs,M-twoR")
+    p.add_argument("--models", type=str, default="M-obs-fixed,M-obs,M-twoR,M-twoR-openloop,M-twoR-sensory")
     p.add_argument("--draws", type=int, default=1000)
     p.add_argument("--tune", type=int, default=1000)
     p.add_argument("--chains", type=int, default=4)
