@@ -267,8 +267,8 @@ def model_numpyro_obs(model_name: str, errors: jnp.ndarray, group_idx: jnp.ndarr
 
 
 def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame,
-        args: argparse.Namespace, group_labels: list[str]) -> dict:
-    """Fit model and return summary."""
+        args: argparse.Namespace, group_labels: list[str]) -> tuple[dict, any]:
+    """Fit model and return summary and InferenceData object."""
 
     errors = build_error_matrix(trials, subjects)
     group_to_idx = {g: i for i, g in enumerate(group_labels)}
@@ -408,7 +408,7 @@ def run(model_name: str, trials: pd.DataFrame, subjects: pd.DataFrame,
         for g, val in enumerate(b_med):
             summary[f"b_{group_labels[g]}"] = float(val)
 
-    return summary
+    return summary, idata
 
 
 def parse_args() -> argparse.Namespace:
@@ -428,6 +428,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-subjects", type=int, default=None)
     p.add_argument("--plateau-group-specific", action="store_true")
     p.add_argument("--out-path", type=Path, default=Path("data/derived/m_obs_results.csv"))
+    p.add_argument("--exclude-subjects", type=str, default=None,
+                   help="Comma-separated list of subject IDs to exclude (e.g., 'EC_018,EO+_005')")
+    p.add_argument("--save-posterior", action="store_true",
+                   help="Save full posterior as NetCDF file for Bayesian analysis")
+    p.add_argument("--posterior-dir", type=Path, default=Path("data/derived/posteriors"),
+                   help="Directory to save posterior .nc files")
     return p.parse_args()
 
 
@@ -442,25 +448,50 @@ def main() -> None:
     require_columns(trials, ["subject", "group", "trial", "error"], args.trials_path)
     subjects = prepare_subject_table(args.delta_path, args.metric, trials)
 
+    # Exclude specified subjects
+    if args.exclude_subjects:
+        exclude_list = [s.strip() for s in args.exclude_subjects.split(",")]
+        n_before = len(subjects)
+        subjects = subjects[~subjects["subject"].isin(exclude_list)]
+        n_excluded = n_before - len(subjects)
+        print(f"Excluded {n_excluded} subjects: {exclude_list}")
+        print(f"Remaining subjects: {len(subjects)}")
+
     if args.max_subjects is not None:
         subjects = subjects.head(args.max_subjects)
         print(f"Limited to {len(subjects)} subjects for testing")
 
+    # Print group counts
+    print(f"\nSubjects per group:")
+    for g in sorted(subjects["group"].unique()):
+        print(f"  {g}: {len(subjects[subjects['group'] == g])}")
+
     group_labels = sorted(subjects["group"].unique())
     models = [m.strip() for m in args.models.split(",") if m.strip()]
+
+    # Create posterior directory if saving
+    if args.save_posterior:
+        args.posterior_dir.mkdir(parents=True, exist_ok=True)
+        print(f"\nPosteriors will be saved to: {args.posterior_dir}")
 
     rows = []
     for model_name in models:
         print(f"\n{'='*60}")
         print(f"Fitting {model_name}...")
         print(f"{'='*60}")
-        res = run(model_name, trials, subjects, args, group_labels)
+        res, idata = run(model_name, trials, subjects, args, group_labels)
         rows.append(res)
         print(f"\nFinished {model_name}:")
         print(f"  WAIC = {res['waic']:.1f}")
         print(f"  LOO = {res['loo']:.1f}")
         print(f"  Rhat = {res['max_rhat']:.3f}")
         print(f"  ESS_bulk = {res['min_ess_bulk']:.0f}")
+
+        # Save posterior if requested
+        if args.save_posterior and idata is not None:
+            nc_path = args.posterior_dir / f"{model_name.lower()}_posterior.nc"
+            idata.to_netcdf(nc_path)
+            print(f"  Saved posterior to: {nc_path}")
 
     args.out_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(args.out_path, index=False)

@@ -1,0 +1,7 @@
+ordering,probability
+EC < EO+ < EO- (expected),0.989
+EC < EO- < EO+,0.01075
+EO+ < EC < EO-,0.00025
+EO+ < EO- < EC,0.0
+EO- < EC < EO+,0.0
+EO- < EO+ < EC,0.0
