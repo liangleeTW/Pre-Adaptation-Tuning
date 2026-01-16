@@ -1,0 +1,96 @@
+======================================================================
+BAYESIAN ANALYSIS OF β_obs (COGNITIVE NOISE MODULATION)
+M-TWOR-SENSORY MODEL
+======================================================================
+
+## WHAT β_obs MEANS IN M-TWOR-SENSORY
+--------------------------------------------------
+
+R_obs = (openloop_var + visual_var) + R_cognitive × exp(β_obs × Δπ)
+        \_________ __________/       \_____________ _______________/
+                  V                                 V
+         Sensory noise (fixed)         Cognitive noise (modulated)
+
+β_obs specifically modulates COGNITIVE noise (attention, strategy),
+NOT sensory noise (motor execution, visual encoding).
+
+Interpretation:
+  β_obs < 0 : Better proprio → LOWER cognitive noise → More focused attention
+  β_obs ≈ 0 : Proprio precision doesn't affect attention
+  β_obs > 0 : Better proprio → HIGHER cognitive noise (unexpected)
+
+
+## 1. POSTERIOR SUMMARY BY GROUP
+--------------------------------------------------
+group      mean    median       sd  HDI_2.5%  HDI_97.5%  P(β < 0)  P(β < -0.5)  P(β < -1.0)
+   EC -1.141975 -1.142655 0.170823 -1.486208  -0.815654   1.00000       1.0000        0.789
+  EO+ -0.419702 -0.414798 0.150096 -0.728156  -0.132329   0.99925       0.2885        0.000
+  EO-  0.078275  0.080088 0.125364 -0.170936   0.321649   0.27200       0.0000        0.000
+
+### Key Findings: Attention Stabilization
+  EC: P(β_obs < 0) = 100.0% → STRONG attention effect
+  EO+: P(β_obs < 0) = 99.9% → MODERATE attention effect
+  EO-: P(β_obs < 0) = 27.2% → NONE attention effect
+
+## 2. PAIRWISE COMPARISONS
+--------------------------------------------------
+(More negative β_obs = stronger attention stabilization)
+
+comparison  P(more_negative)  P(less_negative)  diff_mean  diff_median  diff_sd  HDI_2.5%  HDI_97.5%
+ EC vs EO+           0.99975           0.00025  -0.722273    -0.719984 0.229141 -1.167444  -0.272666
+ EC vs EO-           1.00000           0.00000  -1.220250    -1.219018 0.211393 -1.627916  -0.803475
+EO+ vs EO-           0.99550           0.00450  -0.497977    -0.497046 0.196914 -0.883542  -0.115927
+
+## 3. GROUP ORDERING PROBABILITIES
+--------------------------------------------------
+  P(EC < EO+ < EO- (expected)) = 99.5%
+  P(EC < EO- < EO+) = 0.4%
+  P(EO+ < EC < EO-) = 0.0%
+  P(EO+ < EO- < EC) = 0.0%
+  P(EO- < EC < EO+) = 0.0%
+  P(EO- < EO+ < EC) = 0.0%
+
+## 4. GROUP-SPECIFIC INTERPRETATION
+--------------------------------------------------
+
+EC (Eyes Closed) - β_obs = -1.14:
+  • STRONGEST attention stabilization effect
+  • 95% HDI excludes zero: [-1.49, -0.82]
+  • When eyes are closed, proprioception is the PRIMARY sensory channel
+  • Better proprio precision → more stable proprioceptive attention
+  • Cognitive noise (distraction, strategy shifts) is reduced
+
+EO+ (Eyes Open + Vision) - β_obs = -0.41:
+  • MODERATE attention stabilization effect
+  • 95% HDI: [-0.73, -0.13]
+  • Vision provides an alternative anchor for attention
+  • Proprio tuning helps, but less critical than in EC
+  • Some attention benefit from sharper proprioception
+
+EO- (Eyes Open, No Feedback) - β_obs = 0.08:
+  • NO attention stabilization effect (essentially zero)
+  • 95% HDI includes zero: [-0.17, 0.32]
+  • Visual system is active but provides NO useful feedback
+  • Creates CONFLICT between visual expectation and proprioceptive reality
+  • Proprio tuning cannot stabilize attention due to V-P conflict
+
+## 5. THEORETICAL IMPLICATIONS
+--------------------------------------------------
+
+The β_obs results from M-TWOR-SENSORY reveal a dissociation:
+
+1. β_state (Learning Effect) - ALL groups show positive effect:
+   → Proprioceptive tuning affects SOURCE ESTIMATION (error attribution)
+   → This is a PERCEPTUAL mechanism operating in all conditions
+
+2. β_obs (Attention Effect) - Only EC and EO+ show negative effect:
+   → Proprioceptive tuning affects COGNITIVE NOISE (attention stability)
+   → This is an ATTENTIONAL mechanism requiring sensory coherence
+
+The EO- condition is key: It shows β_state > 0 but β_obs ≈ 0.
+This means:
+   • Perceptual mechanism (source estimation) operates normally
+   • Attentional mechanism is blocked by visual-proprioceptive conflict
+   • The two mechanisms are DISSOCIABLE
+
+======================================================================

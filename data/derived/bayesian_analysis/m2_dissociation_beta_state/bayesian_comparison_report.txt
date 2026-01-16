@@ -1,0 +1,64 @@
+======================================================================
+BAYESIAN COMPARISON OF β_state ACROSS GROUPS (M-TWOR-SENSORY)
+======================================================================
+
+## 1. POSTERIOR SUMMARY BY GROUP
+--------------------------------------------------
+group     mean   median       sd  HDI_2.5%  HDI_97.5%  P(β > 0)  P(β > 0.5)  P(β > 1.0)
+   EC 1.117620 1.123927 0.120461  0.860637   1.328153    1.0000      1.0000      0.8380
+  EO+ 0.663224 0.673506 0.137315  0.372355   0.902568    0.9995      0.8825      0.0025
+  EO- 0.473619 0.491289 0.207566  0.020370   0.822642    0.9800      0.4865      0.0000
+
+### Key Finding: Source-Estimation Support
+  EC: P(β_state > 0) = 100.0%
+  EO+: P(β_state > 0) = 100.0%
+  EO-: P(β_state > 0) = 98.0%
+
+## 2. PAIRWISE COMPARISONS
+--------------------------------------------------
+comparison  P(greater)  P(less)  diff_mean  diff_median  diff_sd  HDI_2.5%  HDI_97.5%
+  EC > EO+      0.9935   0.0065   0.454396     0.453975 0.182123  0.104057   0.822448
+  EC > EO-      0.9995   0.0005   0.644001     0.629389 0.239812  0.206316   1.138232
+ EO+ > EO-      0.7730   0.2270   0.189605     0.182246 0.251407 -0.274337   0.709096
+
+## 3. GROUP ORDERING PROBABILITIES
+--------------------------------------------------
+  P(EC > EO+ > EO-) = 76.6% <-- Expected
+  P(EC > EO- > EO+) = 22.7%
+  P(EO+ > EC > EO-) = 0.6%
+  P(EO+ > EO- > EC) = 0.0%
+  P(EO- > EC > EO+) = 0.0%
+  P(EO- > EO+ > EC) = 0.0%
+
+## 4. EFFECT SIZES (Cohen's d)
+--------------------------------------------------
+comparison  Cohen's d (mean)  Cohen's d (median)  d_HDI_2.5%  d_HDI_97.5%  P(|d| > 0.2)  P(|d| > 0.5)  P(|d| > 0.8)
+  EC - EO+          1.447816            1.446473    0.331552     2.620519        0.9875       0.95025       0.86975
+  EC - EO-          2.051944            2.005385    0.657371     3.626684        0.9965       0.98425       0.95875
+ EO+ - EO-          0.604128            0.580680   -0.874105     2.259353        0.8430       0.61900       0.42425
+
+## 5. INTERPRETATION
+--------------------------------------------------
+
+The Bayesian analysis reveals:
+
+1. SOURCE-ESTIMATION SUPPORT: All three groups show β_state > 0 with high
+   posterior probability (>98%), supporting the
+   source-estimation hypothesis across all sensory conditions.
+
+2. GROUP ORDERING: The expected ordering (EC > EO+ > EO-) has 76.6%
+   posterior probability. This supports
+   the hypothesis that eyes-closed tuning produces the strongest effect.
+
+3. EC vs EO- DIFFERENCE:
+   - Mean difference: 0.644
+   - 95% HDI: [0.206, 1.138]
+   - P(EC > EO-): 100.0%
+
+   The 95% HDI excludes zero, indicating a credible difference.
+
+4. COMPARISON TO FREQUENTIST: Unlike the frequentist ANOVA (p = 0.36), the
+   Bayesian analysis provides direct probability statements about group
+   differences and their magnitudes.
+
+======================================================================

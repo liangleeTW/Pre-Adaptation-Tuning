@@ -1,0 +1,7 @@
+ordering,probability
+EC > EO+ > EO-,0.7665
+EC > EO- > EO+,0.22675
+EO+ > EC > EO-,0.00625
+EO+ > EO- > EC,0.00025
+EO- > EC > EO+,0.00025
+EO- > EO+ > EC,0.0
