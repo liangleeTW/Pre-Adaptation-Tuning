@@ -342,6 +342,8 @@ def main():
     parser.add_argument("--output-dir", type=Path,
                        default=Path("data/derived/bayesian_analysis"),
                        help="Output directory for results")
+    parser.add_argument("--rope", type=float, default=0.1,
+                       help="ROPE width for practical equivalence")
     args = parser.parse_args()
 
     # Create output directory
