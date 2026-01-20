@@ -62,7 +62,10 @@ poetry run python --version  # Should show Python 3.12.x
 - `numpyro` (Bayesian MCMC sampling)
 - `jax` (Accelerated numerical computing)
 - `arviz` (Bayesian diagnostics)
+- `cmdstanpy` (Stan interface for HLM analysis)
 - `pandas`, `numpy`, `scipy`, `matplotlib`, `seaborn`
+
+**Note:** CmdStan (~200MB) downloads automatically on first use to `~/.cmdstan/` (not in project directory).
 
 ---
 
@@ -72,8 +75,9 @@ poetry run python --version  # Should show Python 3.12.x
 Pre-Adaptation-Tuning/
 ├── data/
 │   ├── raw/
-│   │   ├── adaptation_trials.csv                   # INPUT
-│   │   └── proprio_delta_pi.csv                    # INPUT
+│   │   ├── adaptation_trials.csv                   # INPUT (state-space models)
+│   │   ├── proprio_delta_pi.csv                    # INPUT (state-space models)
+│   │   └── HLM_raw.csv                             # INPUT (HLM analysis)
 │   └── derived/
 │       ├── model_comparison_final.csv              # Output from Step 1
 │       ├── final_model_predictions.csv             # Output from Step 2
@@ -82,10 +86,16 @@ Pre-Adaptation-Tuning/
 │       │   ├── m1_coupling_posterior.nc
 │       │   ├── m2_dissociation_posterior.nc
 │       │   └── m3_dd_posterior.nc
-│       └── bayesian_analysis/                      # Output from Step 3
-│           ├── m2_dissociation_beta_state/
-│           └── m3_dd_beta_state/
+│       ├── bayesian_analysis/                      # Output from Step 3
+│       │   ├── m2_dissociation_beta_state/
+│       │   └── m3_dd_beta_state/
+│       └── HLM_NP/                                 # Output from Step 0 (HLM)
+│           ├── stan/
+│           └── results/NP{level}/
 ├── scripts/
+│   ├── HLM_heteroscedastic/
+│   │   ├── nopooling.py
+│   │   └── nopooling_vis.py
 │   ├── modeling/
 │   │   └── fit_real_data.py
 │   ├── analysis/
@@ -101,6 +111,32 @@ Pre-Adaptation-Tuning/
 ---
 
 ## Analysis Pipeline
+
+### Step 0: HLM Heteroscedastic Analysis (Optional Foundation)
+
+**Command:**
+```bash
+# Fit no-pooling models for levels 4, 7, 8
+poetry run python scripts/HLM_heteroscedastic/nopooling.py --levels 4,7,8
+
+# Generate visualizations
+poetry run python scripts/HLM_heteroscedastic/nopooling_vis.py --levels 4,7,8
+```
+
+**Inputs:**
+- `data/raw/HLM_raw.csv`
+
+**Outputs:**
+- `data/derived/HLM_NP/results/NP{level}/posterior.nc`
+- `data/derived/HLM_NP/results/NP{level}/NP{level}_subject_delta_mu.csv`
+- `data/derived/HLM_NP/results/NP{level}/NP{level}_subject_delta_sigma.csv`
+- `figures/NP{level}_*.png`
+
+**Purpose:** Establishes that both mean (μ) and variance (σ) change with adaptation, motivating the need for dissociated state/observation noise in state-space models.
+
+**See:** `scripts/HLM_heteroscedastic/README.md` for detailed documentation.
+
+---
 
 ### Step 1: Model Fitting
 
@@ -230,6 +266,29 @@ print(df[['group', 'mean', 'P(β > 0)']].to_string(index=False))
 df = pd.read_csv('data/derived/bayesian_analysis/m2_dissociation_beta_state/beta_state_pairwise.csv')
 print('\\nβ_state Pairwise:')
 print(df[['comparison', 'P(greater)', 'diff_mean']].to_string(index=False))
+"
+```
+
+---
+
+### Verify HLM Results
+
+```bash
+# Check NP7 convergence
+poetry run python -c "
+import arviz as az
+idata = az.from_netcdf('data/derived/HLM_NP/results/NP7/posterior.nc')
+summary = az.summary(idata, var_names=['alpha', 'beta'], round_to=3)
+print('\\nConvergence Diagnostics (NP7):')
+print(summary[['mean', 'r_hat', 'ess_bulk']].head(10))
+"
+
+# View subject-level deltas
+poetry run python -c "
+import pandas as pd
+df = pd.read_csv('data/derived/HLM_NP/results/NP7/NP7_subject_delta_mu.csv')
+print('\\nΔμ by Group and Modality (NP7):')
+print(df.groupby(['group', 'modality'])['mean'].agg(['mean', 'std']))
 "
 ```
 
