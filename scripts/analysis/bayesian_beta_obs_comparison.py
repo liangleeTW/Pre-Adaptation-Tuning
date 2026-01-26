@@ -21,6 +21,18 @@ import arviz as az
 import matplotlib.pyplot as plt
 from scipy import stats
 
+# Tol colorblind-friendly palette
+# https://sronpersonalpages.nl/~pault/
+tol_bright = [
+    '#4477AA',  # blue
+    '#EE6677',  # red
+    '#228833',  # green
+    '#CCBB44',  # yellow
+    '#66CCEE',  # cyan
+    '#AA3377',  # purple
+    '#BBBBBB',  # grey
+]
+
 
 def load_posterior(nc_path: Path) -> az.InferenceData:
     """Load posterior samples from NetCDF file."""
@@ -121,7 +133,7 @@ def plot_posteriors(beta_data: dict, output_path: Path) -> None:
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
-    colors = {"EC": "#E63946", "EO+": "#457B9D", "EO-": "#2A9D8F"}
+    colors = {"EC": tol_bright[1], "EO+": tol_bright[0], "EO-": tol_bright[2]}
 
     # Panel A: Posterior densities
     ax = axes[0, 0]
@@ -172,8 +184,8 @@ def plot_posteriors(beta_data: dict, output_path: Path) -> None:
     x = np.arange(len(groups))
     width = 0.35
 
-    bars1 = ax.bar(x - width/2, probs, width, label='P(β < 0)', color='#457B9D', alpha=0.8)
-    bars2 = ax.bar(x + width/2, probs_strong, width, label='P(β < -0.5)', color='#E63946', alpha=0.8)
+    bars1 = ax.bar(x - width/2, probs, width, label='P(β < 0)', color=tol_bright[0], alpha=0.8)
+    bars2 = ax.bar(x + width/2, probs_strong, width, label='P(β < -0.5)', color=tol_bright[1], alpha=0.8)
 
     ax.set_ylabel('Posterior Probability', fontsize=12)
     ax.set_xlabel('Group', fontsize=12)
@@ -196,7 +208,7 @@ def plot_posteriors(beta_data: dict, output_path: Path) -> None:
     ax = axes[1, 1]
 
     comparisons = [("EC", "EO+"), ("EC", "EO-"), ("EO+", "EO-")]
-    diff_colors = ["#E63946", "#2A9D8F", "#457B9D"]
+    diff_colors = [tol_bright[1], tol_bright[2], tol_bright[0]]
 
     for i, (g1, g2) in enumerate(comparisons):
         diff = samples[g1] - samples[g2]
