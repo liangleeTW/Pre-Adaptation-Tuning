@@ -19,6 +19,18 @@ import arviz as az
 import matplotlib.pyplot as plt
 from scipy import stats
 
+# Tol colorblind-friendly palette
+# https://sronpersonalpages.nl/~pault/
+tol_bright = [
+    '#4477AA',  # blue
+    '#EE6677',  # red
+    '#228833',  # green
+    '#CCBB44',  # yellow
+    '#66CCEE',  # cyan
+    '#AA3377',  # purple
+    '#BBBBBB',  # grey
+]
+
 
 def load_posterior(nc_path: Path) -> az.InferenceData:
     """Load posterior samples from NetCDF file."""
@@ -153,7 +165,7 @@ def plot_posteriors(beta_data: dict, output_path: Path) -> None:
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
-    colors = {"EC": "#E63946", "EO+": "#457B9D", "EO-": "#2A9D8F"}
+    colors = {"EC": tol_bright[1], "EO+": tol_bright[0], "EO-": tol_bright[2]}
 
     # Panel A: Posterior densities
     ax = axes[0, 0]
@@ -196,7 +208,7 @@ def plot_posteriors(beta_data: dict, output_path: Path) -> None:
     ax = axes[1, 0]
 
     comparisons = [("EC", "EO+"), ("EC", "EO-"), ("EO+", "EO-")]
-    diff_colors = ["#E63946", "#2A9D8F", "#457B9D"]
+    diff_colors = [tol_bright[1], tol_bright[2], tol_bright[0]]
 
     for i, (g1, g2) in enumerate(comparisons):
         diff = samples[g1] - samples[g2]
@@ -226,12 +238,12 @@ def plot_posteriors(beta_data: dict, output_path: Path) -> None:
     labels = [o[0] for o in sorted_orderings]
     probs = [o[1] for o in sorted_orderings]
 
-    bars = ax.barh(range(len(labels)), probs, color="#457B9D", alpha=0.7)
+    bars = ax.barh(range(len(labels)), probs, color=tol_bright[0], alpha=0.7)
 
     # Highlight the expected ordering
     for i, label in enumerate(labels):
         if label == "EC > EO+ > EO-":
-            bars[i].set_color("#E63946")
+            bars[i].set_color(tol_bright[1])
             bars[i].set_alpha(1.0)
 
     ax.set_yticks(range(len(labels)))
@@ -268,7 +280,7 @@ def plot_rope_analysis(beta_data: dict, output_path: Path, rope: float = 0.1) ->
         p_above_rope = np.mean(diff > rope)
 
         # Plot histogram
-        ax.hist(diff, bins=50, density=True, alpha=0.7, color="#457B9D")
+        ax.hist(diff, bins=50, density=True, alpha=0.7, color=tol_bright[0])
 
         # Add ROPE region
         ax.axvspan(-rope, rope, alpha=0.2, color="gray", label=f"ROPE [{-rope}, {rope}]")
@@ -278,8 +290,8 @@ def plot_rope_analysis(beta_data: dict, output_path: Path, rope: float = 0.1) ->
 
         # Add HDI
         hdi_low, hdi_high = np.percentile(diff, [2.5, 97.5])
-        ax.axvline(hdi_low, color="#E63946", ls="--", lw=2)
-        ax.axvline(hdi_high, color="#E63946", ls="--", lw=2)
+        ax.axvline(hdi_low, color=tol_bright[1], ls="--", lw=2)
+        ax.axvline(hdi_high, color=tol_bright[1], ls="--", lw=2)
 
         ax.set_xlabel(f"β_state({g1}) - β_state({g2})", fontsize=11)
         ax.set_ylabel("Density" if i == 0 else "", fontsize=11)
