@@ -1,121 +1,76 @@
-# Pre-Adaptation-Tuning
+# Pre-Adaptation Tuning
 
-Analysis code for proprioceptive tuning effects on visuomotor adaptation.
+Code for *"Prior Sensory Tuning Orients Error Processing During Sensorimotor Adaptation."*
+Implements the three Bayesian state-space models (M1 Coupling, M2 Dissociation,
+M3 Dissociation + Decomposition) and the parameter / model recovery pipeline.
 
----
+[Link to paper — TBD]
 
 ## Setup
 
-### 1. Install Python 3.12 with pyenv
+Requires Python 3.12 and [Poetry](https://python-poetry.org/).
 
 ```bash
-# Install pyenv (if not already installed)
-brew install pyenv
-
-# Install Python 3.12
-pyenv install 3.12
-
-# Set local version for this project
-pyenv local 3.12
-```
-
-### 2. Install Poetry
-
-```bash
-# Install Poetry via Homebrew
-brew install poetry
-```
-
-### 3. Install Dependencies
-
-```bash
-# Activate virtual environment
-poetry init --python "^3.12" -q  # skip this if poetry.lock already exists
 poetry config virtualenvs.in-project true
 poetry env use 3.12
-poetry install --sync
-source .venv/bin/activate
+poetry install
 ```
 
----
+## Reproduce paper figures
 
-## Run Main Analysis
-
-### 1. Extract Data from Raw Files
+The repository ships fitted posteriors and recovery results — see
+[`data/README.md`](data/README.md). The figure script runs end-to-end on
+shipped data:
 
 ```bash
-poetry run python scripts/data_processing/extract_adaptation.py
-poetry run python scripts/data_processing/extract_prepost.py
+poetry run python scripts/analysis/fig34.py
 ```
 
-### 2. Fit Models to Real Data
+Writes `fig3.png` (β_R) and `fig4.png` (β_cog) to `figures/`.
 
-**Fit baseline model (M1-exp):**
-```bash
-poetry run python scripts/modeling/fit_real_data_numpyro.py
-```
+## Re-fit from raw data
 
-**Fit primary model (M2-dual):**
-```bash
-poetry run python scripts/modeling/fit_real_data_m_obs.py --plateau-group-specific
-```
+Raw and trial-level CSVs are not redistributed (see [`data/README.md`](data/README.md)
+for the expected schemas). With those files in place, the full pipeline is:
 
-This produces:
-- `data/derived/m_obs_results.csv` - Parameter estimates (β_state, β_obs)
-- `data/derived/m_obs_predictions.csv` - Trial-by-trial predictions
-- `data/derived/m_obs_fit_metrics.csv` - Fit quality metrics
+### State-space models (M1 / M2 / M3)
 
-### 3. Validate Model Results
+Requires `data/adaptation_trials.csv`.
 
 ```bash
-poetry run python scripts/analysis/validate_m_obs_mechanisms.py
+# M1 (Coupling)
+poetry run python scripts/modeling/fit_m1.py --plateau-group-specific --save-posterior
+
+# M2 (Dissociation) and M3 (Dissociation + Decomposition)
+poetry run python scripts/modeling/fit_m2_m3.py --plateau-group-specific --save-posterior
+
+# Parameter recovery and model recovery → Table 2
+poetry run python scripts/recovery/parameter_recovery.py
+poetry run python scripts/recovery/model_recovery.py
 ```
 
-This generates:
-- `figures/main_comparison_m1exp_vs_mtwoR.png` - Main 8-panel figure
-- `figures/state_slopes_vs_deltalogpi.png` - Mechanistic validation
-- `figures/group_comparisons.png` - Group-level effects
-- `data/derived/state_based_slopes.csv` - State trajectory slopes
+### Localisation HLM (Fig. 2)
 
----
+Heteroscedastic complete-pooling Bayesian HLM in Stan via `cmdstanpy`.
+Requires `scripts/complete_pooling/_preprocessed/pa_long_trials.csv` and a
+working CmdStan installation (`cmdstanpy.install_cmdstan()` once).
 
-## Generate Figures
-
-**All visualizations:**
 ```bash
-poetry run python scripts/visualization/plot_delta_pi_models.py
-poetry run python scripts/visualization/plot_delta_pi_early_learning.py
-poetry run python scripts/visualization/plot_delta_vs_gain.py
+cd scripts/complete_pooling
+poetry run jupyter nbconvert --execute --inplace completepooling_pipe.ipynb
+poetry run jupyter nbconvert --execute --inplace completepooling_vis.ipynb
 ```
 
-Figures are saved to `figures/`.
-
----
-
-## Key Output Files
-
-After running the pipeline, find results in:
-- `data/derived/m_obs_results.csv` - Model parameter estimates
-- `data/derived/state_based_slopes.csv` - Learning slope validation
-- `figures/main_comparison_m1exp_vs_mtwoR.png` - Main figure
-- `VALIDATION_SUMMARY.md` - Complete validation report
-
----
-
-## Documentation
-
-
----
+`completepooling_pipe.ipynb` fits the CP1–CP8 family and writes posteriors to
+`./results/CP{L}/posterior.nc` plus `CP_model_comparison_loo.csv`.
+`completepooling_vis.ipynb` reads CP4 / CP7 / CP8 posteriors and renders the
+μ and σ panels behind Fig. 2.
 
 ## Contributors
 
 <a href="https://github.com/sizluluEZ"><img src="https://avatars.githubusercontent.com/u/132829530?v=4" width="50px;" alt="sizluluEZ"/></a>
 <a href="https://github.com/liangleeTW"><img src="https://avatars.githubusercontent.com/u/52850586?v=4" width="50px;" alt="liangleeTW"/></a>
 
-
-## Citation
-
-
 ## License
 
-See `LICENSE` file.
+See [`LICENSE`](LICENSE).
